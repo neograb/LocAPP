@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}LocAPP - Gestion simplifiée de vos locations{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/commercial.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="{{ url_for('commercial_home') }}" class="nav-logo">
+                <span class="logo-icon">🏡</span>
+                <span class="logo-text">LocAPP</span>
+            </a>
+
+            <button class="nav-toggle" onclick="toggleMobileMenu()">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+
+            <ul class="nav-menu" id="navMenu">
+                {% if current_user and current_user.is_authenticated %}
+                <li><a href="{{ url_for('admin_home') }}" class="nav-link">Mes locations</a></li>
+                {% endif %}
+                <li><a href="{{ url_for('commercial_features') }}" class="nav-link">Fonctionnalités</a></li>
+                <li><a href="{{ url_for('commercial_pricing') }}" class="nav-link">Tarifs</a></li>
+                <li><a href="{{ url_for('commercial_demo') }}" class="nav-link">Démo</a></li>
+                {% if current_user and current_user.is_authenticated %}
+                <li><a href="{{ url_for('logout') }}" class="nav-link nav-link-secondary">Déconnexion</a></li>
+                {% else %}
+                <li><a href="{{ url_for('login') }}" class="nav-link nav-link-primary">Se connecter</a></li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Alert Container -->
+    <div id="alert-container"></div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <div class="footer-logo">
+                        <span class="logo-icon">🏡</span>
+                        <span class="logo-text">LocAPP</span>
+                    </div>
+                    <p class="footer-description">
+                        La solution tout-en-un pour gérer vos locations saisonnières et offrir une expérience exceptionnelle à vos voyageurs.
+                    </p>
+                </div>
+
+                <div class="footer-links">
+                    <h4>Produit</h4>
+                    <ul>
+                        <li><a href="{{ url_for('commercial_features') }}">Fonctionnalités</a></li>
+                        <li><a href="{{ url_for('commercial_pricing') }}">Tarifs</a></li>
+                        <li><a href="{{ url_for('commercial_demo') }}">Démo</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-links">
+                    <h4>Support</h4>
+                    <ul>
+                        <li><a href="#">Centre d'aide</a></li>
+                        <li><a href="#">Documentation</a></li>
+                        <li><a href="#">Contact</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-links">
+                    <h4>Légal</h4>
+                    <ul>
+                        <li><a href="#">Conditions d'utilisation</a></li>
+                        <li><a href="#">Politique de confidentialité</a></li>
+                        <li><a href="#">Mentions légales</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <p>&copy; 2024 LocAPP. Tous droits réservés.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        function toggleMobileMenu() {
+            const navMenu = document.getElementById('navMenu');
+            navMenu.classList.toggle('nav-menu-open');
+        }
+
+        function showAlert(message, type = 'info') {
+            const container = document.getElementById('alert-container');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.innerHTML = `
+                <span>${message}</span>
+                <button onclick="this.parentElement.remove()">&times;</button>
+            `;
+            container.appendChild(alert);
+            setTimeout(() => alert.remove(), 5000);
+        }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

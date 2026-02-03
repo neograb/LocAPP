@@ -1,0 +1,131 @@
+{% extends "commercial/base_commercial.html" %}
+
+{% block title %}Tarifs - LocAPP{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="section" style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); padding-top: 4rem;">
+    <div class="section-container">
+        <div class="section-header">
+            <h2>Des tarifs simples et transparents</h2>
+            <p>Choisissez l'offre adaptée à vos besoins. Sans engagement, sans surprise.</p>
+        </div>
+    </div>
+</section>
+
+<!-- Pricing Cards -->
+<section class="section">
+    <div class="section-container">
+        <div class="pricing-grid">
+            <!-- Free Plan -->
+            <div class="pricing-card">
+                <div class="pricing-header">
+                    <h3>Découverte</h3>
+                    <div class="price">Gratuit</div>
+                </div>
+                <ul class="pricing-features">
+                    <li>1 propriété</li>
+                    <li>QR Code WiFi</li>
+                    <li>Informations d'accès</li>
+                    <li>Adresse et localisation</li>
+                    <li>Contact propriétaire</li>
+                    <li>Numéros d'urgence</li>
+                </ul>
+                <a href="{{ url_for('login') }}" class="btn btn-outline">Commencer gratuitement</a>
+            </div>
+
+            <!-- Pro Plan -->
+            <div class="pricing-card popular">
+                <div class="pricing-badge">Populaire</div>
+                <div class="pricing-header">
+                    <h3>Propriétaire</h3>
+                    <div class="price">9€<span>/mois</span></div>
+                </div>
+                <ul class="pricing-features">
+                    <li>Jusqu'à 3 propriétés</li>
+                    <li>Toutes les fonctionnalités Découverte</li>
+                    <li>Activités et recommandations</li>
+                    <li>Services à proximité</li>
+                    <li>Informations parking</li>
+                    <li>Personnalisation des couleurs</li>
+                    <li>Support prioritaire</li>
+                </ul>
+                <a href="{{ url_for('login') }}" class="btn btn-primary">Choisir ce plan</a>
+            </div>
+
+            <!-- Business Plan -->
+            <div class="pricing-card">
+                <div class="pricing-header">
+                    <h3>Gestionnaire</h3>
+                    <div class="price">29€<span>/mois</span></div>
+                </div>
+                <ul class="pricing-features">
+                    <li>Propriétés illimitées</li>
+                    <li>Toutes les fonctionnalités Propriétaire</li>
+                    <li>Thèmes personnalisés par propriété</li>
+                    <li>Export des QR Codes en lot</li>
+                    <li>API d'intégration</li>
+                    <li>Support dédié</li>
+                    <li>Formation personnalisée</li>
+                </ul>
+                <a href="{{ url_for('login') }}" class="btn btn-outline">Nous contacter</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FAQ -->
+<section class="section section-light">
+    <div class="section-container">
+        <div class="section-header">
+            <h2>Questions fréquentes</h2>
+            <p>Tout ce que vous devez savoir sur nos offres</p>
+        </div>
+        <div style="max-width: 800px; margin: 0 auto;">
+            <div class="feature-card" style="margin-bottom: 1rem;">
+                <h3>Puis-je changer d'offre à tout moment ?</h3>
+                <p>Oui, vous pouvez upgrader ou downgrader votre abonnement à tout moment. Le changement prend effet immédiatement et le prorata est calculé automatiquement.</p>
+            </div>
+            <div class="feature-card" style="margin-bottom: 1rem;">
+                <h3>Y a-t-il un engagement minimum ?</h3>
+                <p>Non, tous nos abonnements sont sans engagement. Vous pouvez résilier à tout moment depuis votre espace client.</p>
+            </div>
+            <div class="feature-card" style="margin-bottom: 1rem;">
+                <h3>Comment fonctionne la période d'essai ?</h3>
+                <p>L'offre Découverte est gratuite et illimitée dans le temps pour 1 propriété. Vous pouvez tester toutes les fonctionnalités de base sans limite de durée.</p>
+            </div>
+            <div class="feature-card" style="margin-bottom: 1rem;">
+                <h3>Quels moyens de paiement acceptez-vous ?</h3>
+                <p>Nous acceptons les cartes bancaires (Visa, Mastercard, American Express) et les paiements par prélèvement SEPA.</p>
+            </div>
+            <div class="feature-card" style="margin-bottom: 1rem;">
+                <h3>Mes voyageurs doivent-ils payer ou télécharger une app ?</h3>
+                <p>Non, jamais. L'accès pour vos voyageurs est totalement gratuit et ne nécessite aucun téléchargement. Un simple scan du QR Code suffit.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Proposez-vous des tarifs pour les grandes structures ?</h3>
+                <p>Oui, contactez-nous pour les tarifs entreprise si vous gérez plus de 10 propriétés. Nous proposons des offres sur mesure.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Guarantee -->
+<section class="section">
+    <div class="section-container">
+        <div style="text-align: center; max-width: 600px; margin: 0 auto;">
+            <div style="font-size: 4rem; margin-bottom: 1rem;">🛡️</div>
+            <h2>Satisfait ou remboursé</h2>
+            <p style="color: var(--text-light); margin-bottom: 2rem;">Testez LocAPP pendant 30 jours. Si vous n'êtes pas satisfait, nous vous remboursons intégralement, sans question.</p>
+            <a href="{{ url_for('login') }}" class="btn btn-primary btn-large">Commencer maintenant</a>
+        </div>
+    </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+    <h2>Des questions ?</h2>
+    <p>Notre équipe est disponible pour vous aider à choisir l'offre la plus adaptée à vos besoins.</p>
+    <a href="mailto:contact@locapp.fr" class="btn btn-secondary btn-large">Nous contacter</a>
+</section>
+{% endblock %}

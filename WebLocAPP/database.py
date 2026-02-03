@@ -1,5 +1,6 @@
 import sqlite3
 import json
+import re
 from datetime import datetime
 
 class Database:
@@ -8,7 +9,8 @@ class Database:
         self.init_db()
 
     def get_connection(self):
-        conn = sqlite3.connect(self.db_name)
+        # Add timeout=30 to wait up to 30 seconds for database locks to be released
+        conn = sqlite3.connect(self.db_name, timeout=30)
         conn.row_factory = sqlite3.Row
         return conn
 
@@ -21,6 +23,7 @@ class Database:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS properties (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
                 name TEXT NOT NULL,
                 slug TEXT NOT NULL UNIQUE,
                 icon TEXT DEFAULT '🏠',
@@ -31,7 +34,8 @@ class Database:
                 is_active BOOLEAN DEFAULT 1,
                 display_order INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
             )
         ''')
 
@@ -120,6 +124,7 @@ class Database:
                 airbnb_url TEXT,
                 description TEXT,
                 response_time TEXT,
+                avatar TEXT,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (property_id) REFERENCES properties(id)
             )
@@ -219,11 +224,112 @@ class Database:
             )
         ''')
 
+        # Table pour les utilisateurs
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT NOT NULL UNIQUE,
+                firstname TEXT NOT NULL,
+                lastname TEXT NOT NULL,
+                password_hash TEXT,
+                google_id TEXT,
+                is_active BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # Table pour les tokens de réinitialisation de mot de passe
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                token TEXT NOT NULL UNIQUE,
+                expires_at TIMESTAMP NOT NULL,
+                used BOOLEAN DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        ''')
+
+        # Table pour les photos
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS photos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                property_id INTEGER NOT NULL,
+                filename TEXT NOT NULL,
+                original_name TEXT NOT NULL,
+                title TEXT,
+                description TEXT,
+                display_order INTEGER DEFAULT 0,
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (property_id) REFERENCES properties(id)
+            )
+        ''')
+
         conn.commit()
 
         # Migrer les données existantes et insérer les valeurs par défaut
         self._migrate_and_insert_default_data(cursor, conn)
+
+        # Migrate: add user_id column if it doesn't exist
+        self._migrate_add_user_id_to_properties(cursor, conn)
+
+        # Migrate: add avatar column to contact_info if it doesn't exist
+        self._migrate_add_avatar_to_contact_info(cursor, conn)
+
+        # Migrate: add region column to properties if it doesn't exist
+        self._migrate_add_region_to_properties(cursor, conn)
+
         conn.close()
+
+    def _migrate_add_user_id_to_properties(self, cursor, conn):
+        """Migration: Add user_id column to properties if it doesn't exist"""
+        # Check if user_id column exists
+        cursor.execute("PRAGMA table_info(properties)")
+        columns = [col[1] for col in cursor.fetchall()]
+
+        if 'user_id' not in columns:
+            cursor.execute('ALTER TABLE properties ADD COLUMN user_id INTEGER REFERENCES users(id)')
+            conn.commit()
+
+        # Create default user abonard@gmail.com if not exists
+        cursor.execute("SELECT id FROM users WHERE email = ?", ('abonard@gmail.com',))
+        user_row = cursor.fetchone()
+
+        if not user_row:
+            # Create the user
+            cursor.execute('''
+                INSERT INTO users (email, firstname, lastname, password_hash)
+                VALUES (?, ?, ?, ?)
+            ''', ('abonard@gmail.com', 'Alexandre', 'Bonard', None))
+            conn.commit()
+            user_id = cursor.lastrowid
+        else:
+            user_id = user_row[0]
+
+        # Link existing properties (Mazet BSA and Vaujany) to abonard@gmail.com
+        # Update properties that don't have a user_id yet
+        cursor.execute("UPDATE properties SET user_id = ? WHERE user_id IS NULL", (user_id,))
+        conn.commit()
+
+    def _migrate_add_avatar_to_contact_info(self, cursor, conn):
+        """Migration: Add avatar column to contact_info if it doesn't exist"""
+        cursor.execute("PRAGMA table_info(contact_info)")
+        columns = [col[1] for col in cursor.fetchall()]
+
+        if 'avatar' not in columns:
+            cursor.execute('ALTER TABLE contact_info ADD COLUMN avatar TEXT')
+            conn.commit()
+
+    def _migrate_add_region_to_properties(self, cursor, conn):
+        """Migration: Add region column to properties if it doesn't exist"""
+        cursor.execute("PRAGMA table_info(properties)")
+        columns = [col[1] for col in cursor.fetchall()]
+
+        if 'region' not in columns:
+            cursor.execute('ALTER TABLE properties ADD COLUMN region TEXT')
+            conn.commit()
 
     def _migrate_and_insert_default_data(self, cursor, conn):
         """Migrate existing data and insert default data"""
@@ -534,9 +640,26 @@ class Database:
 
     # ==================== Properties ====================
 
-    def get_all_properties(self):
+    def get_all_properties(self, user_id=None):
+        """Get all properties, optionally filtered by user_id"""
         conn = self.get_connection()
-        results = conn.execute('SELECT * FROM properties WHERE is_active = 1 ORDER BY display_order').fetchall()
+        if user_id:
+            results = conn.execute(
+                'SELECT * FROM properties WHERE is_active = 1 AND user_id = ? ORDER BY display_order',
+                (user_id,)
+            ).fetchall()
+        else:
+            results = conn.execute('SELECT * FROM properties WHERE is_active = 1 ORDER BY display_order').fetchall()
+        conn.close()
+        return [dict(row) for row in results]
+
+    def get_properties_by_user(self, user_id):
+        """Get all properties for a specific user"""
+        conn = self.get_connection()
+        results = conn.execute(
+            'SELECT * FROM properties WHERE user_id = ? AND is_active = 1 ORDER BY display_order',
+            (user_id,)
+        ).fetchall()
         conn.close()
         return [dict(row) for row in results]
 
@@ -551,6 +674,293 @@ class Database:
         result = conn.execute('SELECT * FROM properties WHERE slug=?', (slug,)).fetchone()
         conn.close()
         return dict(result) if result else None
+
+    def create_property(self, data, user_id=None):
+        """Create a new property and initialize all related tables"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        # Insert the property
+        cursor.execute('''
+            INSERT INTO properties (name, slug, icon, location, region, theme, is_active, display_order, user_id)
+            VALUES (?, ?, ?, ?, ?, 'mazet-bsa', 1, (SELECT COALESCE(MAX(display_order), 0) + 1 FROM properties), ?)
+        ''', (data['name'], data['slug'], data.get('icon', '🏠'), data.get('address', ''), data.get('region', ''), user_id))
+
+        property_id = cursor.lastrowid
+
+        # Initialize general_info
+        cursor.execute('''
+            INSERT INTO general_info (property_id, property_name, welcome_title, welcome_message, welcome_description)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (property_id, data['name'], f"Bienvenue à {data['name']}", "Nous sommes ravis de vous accueillir!", "Toutes les informations utiles pour votre séjour."))
+
+        # Initialize wifi_config
+        cursor.execute('''
+            INSERT INTO wifi_config (property_id, ssid, password, location_description)
+            VALUES (?, ?, ?, ?)
+        ''', (property_id, "WiFi_" + data['slug'].replace('-', '_'), "À configurer", "À configurer"))
+
+        # Initialize address with geocoded data
+        address_parts = data.get('address', '').split(',')
+        street = address_parts[0].strip() if address_parts else ''
+        city = address_parts[-1].strip() if len(address_parts) > 1 else ''
+        postal_code = ''
+        # Try to extract postal code
+        postal_match = re.search(r'\b(\d{5})\b', data.get('address', ''))
+        if postal_match:
+            postal_code = postal_match.group(1)
+
+        cursor.execute('''
+            INSERT INTO address (property_id, street, postal_code, city, latitude, longitude, description)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (property_id, street, postal_code, city, data.get('latitude'), data.get('longitude'), data.get('address', '')))
+
+        # Initialize parking_info
+        cursor.execute('''
+            INSERT INTO parking_info (property_id, distance, description, is_free, tips)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (property_id, "À configurer", "À configurer", 1, ""))
+
+        # Initialize access_info
+        cursor.execute('''
+            INSERT INTO access_info (property_id, key_location, arrival_instructions, door_code, special_notes)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (property_id, "À configurer", "À configurer", "", ""))
+
+        # Initialize contact_info
+        cursor.execute('''
+            INSERT INTO contact_info (property_id, owner_name, owner_phone, owner_email)
+            VALUES (?, ?, ?, ?)
+        ''', (property_id, "À configurer", "", ""))
+
+        conn.commit()
+        conn.close()
+
+        return property_id
+
+    def duplicate_property_from_template(self, template_property_id, new_property_data, user_id=None):
+        """
+        Create a new property by duplicating all data from a template property.
+        This is used for the "Create without AI" feature.
+
+        Args:
+            template_property_id: ID of the template property (e.g., Mazet-Demo = 3)
+            new_property_data: dict with 'name', 'address', 'icon', 'latitude', 'longitude', 'region'
+            user_id: ID of the user who will own the new property
+
+        Returns:
+            The ID of the newly created property
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # 1. Create the new property record
+            cursor.execute('''
+                INSERT INTO properties (name, slug, icon, location, region, theme, is_active, display_order, user_id)
+                VALUES (?, ?, ?, ?, ?, 'mazet-bsa', 1, (SELECT COALESCE(MAX(display_order), 0) + 1 FROM properties), ?)
+            ''', (
+                new_property_data['name'],
+                new_property_data['slug'],
+                new_property_data.get('icon', '🏠'),
+                new_property_data.get('address', ''),
+                new_property_data.get('region', ''),
+                user_id
+            ))
+            new_property_id = cursor.lastrowid
+
+            # 2. Duplicate general_info from template
+            cursor.execute('SELECT * FROM general_info WHERE property_id=?', (template_property_id,))
+            template_general = cursor.fetchone()
+            if template_general:
+                cursor.execute('''
+                    INSERT INTO general_info (property_id, property_name, welcome_title, welcome_message, welcome_description)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (
+                    new_property_id,
+                    new_property_data['name'],  # Use the new property name
+                    f"Bienvenue à {new_property_data['name']} ! 🌿",
+                    template_general['welcome_message'],
+                    template_general['welcome_description']
+                ))
+
+            # 3. Duplicate wifi_config from template
+            cursor.execute('SELECT * FROM wifi_config WHERE property_id=?', (template_property_id,))
+            template_wifi = cursor.fetchone()
+            if template_wifi:
+                cursor.execute('''
+                    INSERT INTO wifi_config (property_id, ssid, password, location_description)
+                    VALUES (?, ?, ?, ?)
+                ''', (
+                    new_property_id,
+                    "WiFi_" + new_property_data['slug'].replace('-', '_'),  # Generate new SSID
+                    "À configurer",  # Password to be configured
+                    template_wifi['location_description']
+                ))
+
+            # 4. Parse and insert address
+            address_str = new_property_data.get('address', '')
+            address_parts = address_str.split(',')
+
+            # Try to extract components from the address
+            street = address_parts[0].strip() if address_parts else ''
+            city = ''
+            postal_code = ''
+            country = 'France'
+
+            # Parse address: typically "Street, Postal Code City, Country" or "Street, City"
+            if len(address_parts) >= 2:
+                # Look for postal code (5 digits in France)
+                for part in address_parts[1:]:
+                    postal_match = re.search(r'\b(\d{5})\b', part)
+                    if postal_match:
+                        postal_code = postal_match.group(1)
+                        # City is the part after the postal code
+                        city_part = part.replace(postal_code, '').strip()
+                        if city_part:
+                            city = city_part
+                    elif not city and part.strip():
+                        city = part.strip()
+
+            # If city wasn't found but we have multiple parts, use the last one
+            if not city and len(address_parts) > 1:
+                city = address_parts[-1].strip()
+
+            cursor.execute('''
+                INSERT INTO address (property_id, street, postal_code, city, country, latitude, longitude, description)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                new_property_id,
+                street,
+                postal_code,
+                city,
+                country,
+                new_property_data.get('latitude'),
+                new_property_data.get('longitude'),
+                address_str  # Full address as description
+            ))
+
+            # 5. Duplicate parking_info from template
+            cursor.execute('SELECT * FROM parking_info WHERE property_id=?', (template_property_id,))
+            template_parking = cursor.fetchone()
+            if template_parking:
+                cursor.execute('''
+                    INSERT INTO parking_info (property_id, distance, description, is_free, tips)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (
+                    new_property_id,
+                    template_parking['distance'],
+                    template_parking['description'],
+                    template_parking['is_free'],
+                    template_parking['tips']
+                ))
+
+            # 6. Duplicate access_info from template
+            cursor.execute('SELECT * FROM access_info WHERE property_id=?', (template_property_id,))
+            template_access = cursor.fetchone()
+            if template_access:
+                access_dict = dict(template_access)
+                cursor.execute('''
+                    INSERT INTO access_info (property_id, check_in_time, check_out_time, keybox_code, keybox_location, access_instructions)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (
+                    new_property_id,
+                    access_dict.get('check_in_time', '16:00'),
+                    access_dict.get('check_out_time', '10:00'),
+                    access_dict.get('keybox_code', ''),
+                    access_dict.get('keybox_location', ''),
+                    access_dict.get('access_instructions', '')
+                ))
+
+            # 7. Duplicate contact_info from template (with placeholder values)
+            cursor.execute('SELECT * FROM contact_info WHERE property_id=?', (template_property_id,))
+            template_contact = cursor.fetchone()
+            if template_contact:
+                contact_dict = dict(template_contact)
+                cursor.execute('''
+                    INSERT INTO contact_info (property_id, host_name, phone, email, whatsapp, airbnb_url, description, response_time)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    new_property_id,
+                    contact_dict.get('host_name', 'Votre nom'),
+                    contact_dict.get('phone', 'À configurer'),
+                    contact_dict.get('email', 'À configurer'),
+                    contact_dict.get('whatsapp', ''),
+                    contact_dict.get('airbnb_url', ''),
+                    contact_dict.get('description', 'À votre service pour un séjour parfait'),
+                    contact_dict.get('response_time', 'Réponse rapide')
+                ))
+
+            # 8. Duplicate activities from template
+            cursor.execute('SELECT * FROM activities WHERE property_id=?', (template_property_id,))
+            template_activities = cursor.fetchall()
+            for activity in template_activities:
+                cursor.execute('''
+                    INSERT INTO activities (property_id, category, name, description, emoji, distance, latitude, longitude, display_order)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    new_property_id,
+                    activity['category'],
+                    activity['name'],
+                    activity['description'],
+                    activity['emoji'],
+                    activity['distance'],
+                    activity['latitude'],
+                    activity['longitude'],
+                    activity['display_order']
+                ))
+
+            # 9. Duplicate nearby_services from template
+            cursor.execute('SELECT * FROM nearby_services WHERE property_id=?', (template_property_id,))
+            template_services = cursor.fetchall()
+            for service in template_services:
+                cursor.execute('''
+                    INSERT INTO nearby_services (property_id, category, name, description, address, phone, opening_hours, icon, latitude, longitude, display_order)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    new_property_id,
+                    service['category'],
+                    service['name'],
+                    service['description'],
+                    service['address'],
+                    service['phone'],
+                    service['opening_hours'],
+                    service['icon'],
+                    service['latitude'],
+                    service['longitude'],
+                    service['display_order']
+                ))
+
+            # 10. Duplicate emergency_numbers from template
+            cursor.execute('SELECT * FROM emergency_numbers WHERE property_id=?', (template_property_id,))
+            template_emergency = cursor.fetchall()
+            for emergency in template_emergency:
+                cursor.execute('''
+                    INSERT INTO emergency_numbers (property_id, name, number, category, display_order)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (
+                    new_property_id,
+                    emergency['name'],
+                    emergency['number'],
+                    emergency['category'],
+                    emergency['display_order']
+                ))
+
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+        return new_property_id
+
+    def get_template_property_id(self):
+        """Get the ID of the template property (Mazet - Demo)"""
+        conn = self.get_connection()
+        result = conn.execute("SELECT id FROM properties WHERE slug = 'mazet-demo' OR name LIKE '%Demo%' LIMIT 1").fetchone()
+        conn.close()
+        return result['id'] if result else None
 
     # ==================== General Info ====================
 
@@ -568,6 +978,14 @@ class Database:
             SET property_name=?, welcome_title=?, welcome_message=?, welcome_description=?, updated_at=CURRENT_TIMESTAMP
             WHERE property_id=?
         ''', (data['property_name'], data['welcome_title'], data['welcome_message'], data['welcome_description'], property_id))
+
+        # Also update the property name in the properties table (for the dropdown menu)
+        cursor.execute('''
+            UPDATE properties
+            SET name=?
+            WHERE id=?
+        ''', (data['property_name'], property_id))
+
         conn.commit()
         conn.close()
 
@@ -663,6 +1081,18 @@ class Database:
             SET host_name=?, phone=?, email=?, whatsapp=?, airbnb_url=?, description=?, response_time=?, updated_at=CURRENT_TIMESTAMP
             WHERE property_id=?
         ''', (data['host_name'], data['phone'], data['email'], data.get('whatsapp', ''), data.get('airbnb_url', ''), data.get('description', ''), data.get('response_time', ''), property_id))
+        conn.commit()
+        conn.close()
+
+    def update_contact_avatar(self, property_id, avatar_filename):
+        """Update only the avatar field for a contact"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE contact_info
+            SET avatar=?, updated_at=CURRENT_TIMESTAMP
+            WHERE property_id=?
+        ''', (avatar_filename, property_id))
         conn.commit()
         conn.close()
 
@@ -788,3 +1218,164 @@ class Database:
             'exported_at': datetime.now().isoformat()
         }
         return data
+
+    # ==================== Users ====================
+
+    def get_user_by_email(self, email):
+        """Get a user by email"""
+        conn = self.get_connection()
+        result = conn.execute('SELECT * FROM users WHERE email=? AND is_active=1', (email.lower(),)).fetchone()
+        conn.close()
+        return dict(result) if result else None
+
+    def get_user_by_id(self, user_id):
+        """Get a user by ID"""
+        conn = self.get_connection()
+        result = conn.execute('SELECT * FROM users WHERE id=? AND is_active=1', (user_id,)).fetchone()
+        conn.close()
+        return dict(result) if result else None
+
+    def create_user(self, data):
+        """Create a new user"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO users (email, firstname, lastname, password_hash, google_id)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (
+            data['email'].lower(),
+            data['firstname'],
+            data['lastname'],
+            data.get('password_hash'),
+            data.get('google_id')
+        ))
+        conn.commit()
+        user_id = cursor.lastrowid
+        conn.close()
+        return user_id
+
+    def update_user(self, user_id, data):
+        """Update user information"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE users
+            SET firstname=?, lastname=?, updated_at=CURRENT_TIMESTAMP
+            WHERE id=?
+        ''', (data.get('firstname'), data.get('lastname'), user_id))
+        conn.commit()
+        conn.close()
+
+    def update_user_password(self, user_id, password_hash):
+        """Update user password"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE users
+            SET password_hash=?, updated_at=CURRENT_TIMESTAMP
+            WHERE id=?
+        ''', (password_hash, user_id))
+        conn.commit()
+        conn.close()
+
+    # ==================== Password Reset Tokens ====================
+
+    def create_password_reset_token(self, user_id, token, expires_at):
+        """Create a password reset token"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        # Invalidate any existing tokens for this user
+        cursor.execute('UPDATE password_reset_tokens SET used = 1 WHERE user_id = ? AND used = 0', (user_id,))
+        # Create new token
+        cursor.execute('''
+            INSERT INTO password_reset_tokens (user_id, token, expires_at)
+            VALUES (?, ?, ?)
+        ''', (user_id, token, expires_at))
+        conn.commit()
+        token_id = cursor.lastrowid
+        conn.close()
+        return token_id
+
+    def get_valid_reset_token(self, token):
+        """Get a valid (unused, not expired) reset token"""
+        conn = self.get_connection()
+        result = conn.execute('''
+            SELECT prt.*, u.email, u.firstname, u.lastname
+            FROM password_reset_tokens prt
+            JOIN users u ON prt.user_id = u.id
+            WHERE prt.token = ? AND prt.used = 0 AND prt.expires_at > datetime('now')
+        ''', (token,)).fetchone()
+        conn.close()
+        return dict(result) if result else None
+
+    def mark_token_as_used(self, token):
+        """Mark a reset token as used"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('UPDATE password_reset_tokens SET used = 1 WHERE token = ?', (token,))
+        conn.commit()
+        conn.close()
+
+    # ==================== Photos ====================
+
+    def get_all_photos(self, property_id):
+        """Get all photos for a property"""
+        conn = self.get_connection()
+        results = conn.execute(
+            'SELECT * FROM photos WHERE property_id=? ORDER BY display_order, uploaded_at DESC',
+            (property_id,)
+        ).fetchall()
+        conn.close()
+        return [dict(row) for row in results]
+
+    def get_photo(self, photo_id):
+        """Get a single photo by ID"""
+        conn = self.get_connection()
+        result = conn.execute('SELECT * FROM photos WHERE id=?', (photo_id,)).fetchone()
+        conn.close()
+        return dict(result) if result else None
+
+    def create_photo(self, data, property_id):
+        """Create a new photo entry"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO photos (property_id, filename, original_name, title, description, display_order)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (
+            property_id,
+            data['filename'],
+            data['original_name'],
+            data.get('title', ''),
+            data.get('description', ''),
+            data.get('display_order', 0)
+        ))
+        conn.commit()
+        photo_id = cursor.lastrowid
+        conn.close()
+        return photo_id
+
+    def update_photo(self, photo_id, data):
+        """Update a photo's metadata"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE photos
+            SET title=?, description=?, display_order=?
+            WHERE id=?
+        ''', (
+            data.get('title', ''),
+            data.get('description', ''),
+            data.get('display_order', 0),
+            photo_id
+        ))
+        conn.commit()
+        conn.close()
+
+    def delete_photo(self, photo_id):
+        """Delete a photo entry"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM photos WHERE id=?', (photo_id,))
+        conn.commit()
+        conn.close()

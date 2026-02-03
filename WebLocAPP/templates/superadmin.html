@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SuperAdmin - LocApp Database</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/commercial.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: #1a1a2e;
+            color: #eee;
+            font-family: 'Inter', monospace;
+        }
+        .superadmin-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .superadmin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #333;
+        }
+        .superadmin-header h1 {
+            color: #e94560;
+            font-size: 1.5rem;
+        }
+        .superadmin-header .logout-btn {
+            background: #e94560;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.875rem;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .stat-card {
+            background: #16213e;
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid #0f3460;
+        }
+        .stat-card h3 {
+            color: #e94560;
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        .stat-card p {
+            color: #888;
+            font-size: 0.875rem;
+        }
+        .section {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid #0f3460;
+        }
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .section h2 {
+            color: #e94560;
+            font-size: 1.25rem;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+        .data-table th, .data-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #0f3460;
+        }
+        .data-table th {
+            background: #0f3460;
+            color: #e94560;
+            font-weight: 600;
+        }
+        .data-table tr:hover {
+            background: rgba(233, 69, 96, 0.1);
+        }
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+        .btn-danger {
+            background: #e94560;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #c73e54;
+        }
+        .btn-primary {
+            background: #0f3460;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #1a4a7a;
+        }
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+        .actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .alert {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        .alert-success {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid #10b981;
+            color: #10b981;
+        }
+        .alert-error {
+            background: rgba(233, 69, 96, 0.2);
+            border: 1px solid #e94560;
+            color: #e94560;
+        }
+        .badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+        .badge-active {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+        .badge-inactive {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+        .sql-console {
+            background: #0d1117;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        .sql-console textarea {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: #58a6ff;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            resize: vertical;
+            min-height: 100px;
+        }
+        .sql-console textarea:focus {
+            outline: none;
+        }
+        .sql-results {
+            margin-top: 1rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .sql-results pre {
+            color: #8b949e;
+            font-size: 0.75rem;
+            white-space: pre-wrap;
+        }
+        .warning-box {
+            background: rgba(245, 158, 11, 0.2);
+            border: 1px solid #f59e0b;
+            color: #f59e0b;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="superadmin-container">
+        <div class="superadmin-header">
+            <h1>🔧 SuperAdmin - Database Management</h1>
+            <div>
+                <span style="color: #888; margin-right: 1rem;">Connecté en tant que: <strong style="color: #e94560;">{{ admin_user }}</strong></span>
+                <a href="{{ url_for('superadmin_logout') }}" class="logout-btn">Déconnexion</a>
+            </div>
+        </div>
+
+        <div id="alert-container"></div>
+
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>{{ stats.users }}</h3>
+                <p>Utilisateurs</p>
+            </div>
+            <div class="stat-card">
+                <h3>{{ stats.properties }}</h3>
+                <p>Propriétés</p>
+            </div>
+            <div class="stat-card">
+                <h3>{{ stats.activities }}</h3>
+                <p>Activités</p>
+            </div>
+            <div class="stat-card">
+                <h3>{{ stats.services }}</h3>
+                <p>Services</p>
+            </div>
+            <div class="stat-card" style="border-color: #10b981;">
+                <h3 style="color: #10b981;">{{ stats.active_sessions }}</h3>
+                <p>Sessions actives</p>
+            </div>
+        </div>
+
+        <!-- Active Sessions Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>🟢 Utilisateurs connectés</h2>
+                <button class="btn btn-primary" onclick="refreshSessions()">Actualiser</button>
+            </div>
+            {% if active_sessions %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Utilisateur</th>
+                        <th>Email</th>
+                        <th>Connexion</th>
+                        <th>Dernière activité</th>
+                        <th>Navigateur</th>
+                        <th>IP</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="sessions-table">
+                    {% for sess in active_sessions %}
+                    <tr>
+                        <td><strong>{{ sess.firstname }} {{ sess.lastname }}</strong></td>
+                        <td>{{ sess.email }}</td>
+                        <td>{{ sess.login_time[:19] if sess.login_time else '-' }}</td>
+                        <td>{{ sess.last_activity[:19] if sess.last_activity else '-' }}</td>
+                        <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ sess.user_agent }}">{{ sess.user_agent[:50] }}{% if sess.user_agent|length > 50 %}...{% endif %}</td>
+                        <td>{{ sess.ip_address }}</td>
+                        <td class="actions">
+                            <button class="btn btn-danger btn-sm" onclick="disconnectSession('{{ sess.token_preview }}', '{{ sess.email }}')">Déconnecter</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="color: #888; text-align: center; padding: 2rem;">Aucun utilisateur connecté actuellement</p>
+            {% endif %}
+        </div>
+
+        <!-- Users Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>👥 Utilisateurs</h2>
+                <button class="btn btn-primary" onclick="refreshData()">Actualiser</button>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Email</th>
+                        <th>Prénom</th>
+                        <th>Nom</th>
+                        <th>Google ID</th>
+                        <th>Créé le</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="users-table">
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ user.id }}</td>
+                        <td>{{ user.email }}</td>
+                        <td>{{ user.firstname }}</td>
+                        <td>{{ user.lastname }}</td>
+                        <td>{{ user.google_id or '-' }}</td>
+                        <td>{{ user.created_at }}</td>
+                        <td class="actions">
+                            <button class="btn btn-primary btn-sm" onclick="openResetPasswordModal({{ user.id }}, '{{ user.email }}')">Mot de passe</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteUser({{ user.id }}, '{{ user.email }}')">Supprimer</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Properties Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>🏠 Propriétés</h2>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Icon</th>
+                        <th>Nom</th>
+                        <th>Slug</th>
+                        <th>Propriétaire (user_id)</th>
+                        <th>Thème</th>
+                        <th>Actif</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for prop in properties %}
+                    <tr>
+                        <td>{{ prop.id }}</td>
+                        <td>{{ prop.icon }}</td>
+                        <td>{{ prop.name }}</td>
+                        <td><code>{{ prop.slug }}</code></td>
+                        <td>{{ prop.user_id or '-' }} {% if prop.owner_email %}({{ prop.owner_email }}){% endif %}</td>
+                        <td>{{ prop.theme }}</td>
+                        <td>
+                            {% if prop.is_active %}
+                            <span class="badge badge-active">Actif</span>
+                            {% else %}
+                            <span class="badge badge-inactive">Inactif</span>
+                            {% endif %}
+                        </td>
+                        <td class="actions">
+                            <button class="btn btn-primary btn-sm" onclick="toggleProperty({{ prop.id }})">Toggle</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteProperty({{ prop.id }}, '{{ prop.name }}')">Supprimer</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- SQL Console -->
+        <div class="section">
+            <div class="section-header">
+                <h2>💻 Console SQL (Lecture seule)</h2>
+            </div>
+            <div class="warning-box">
+                ⚠️ Attention: Cette console permet uniquement les requêtes SELECT pour des raisons de sécurité.
+            </div>
+            <div class="sql-console">
+                <textarea id="sql-query" placeholder="SELECT * FROM users LIMIT 10;">SELECT * FROM users LIMIT 10;</textarea>
+                <div style="margin-top: 0.5rem;">
+                    <button class="btn btn-primary" onclick="executeSQL()">Exécuter</button>
+                </div>
+                <div class="sql-results" id="sql-results">
+                    <pre>Résultats de la requête...</pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Database Tables Info -->
+        <div class="section">
+            <div class="section-header">
+                <h2>📋 Tables de la base de données</h2>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Table</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>users</code></td><td>Comptes utilisateurs</td></tr>
+                    <tr><td><code>properties</code></td><td>Propriétés/Locations</td></tr>
+                    <tr><td><code>general_info</code></td><td>Informations générales par propriété</td></tr>
+                    <tr><td><code>wifi_config</code></td><td>Configuration WiFi</td></tr>
+                    <tr><td><code>address</code></td><td>Adresses des propriétés</td></tr>
+                    <tr><td><code>parking_info</code></td><td>Informations parking</td></tr>
+                    <tr><td><code>access_info</code></td><td>Instructions d'accès</td></tr>
+                    <tr><td><code>contact_info</code></td><td>Contacts propriétaires</td></tr>
+                    <tr><td><code>activities</code></td><td>Activités à proximité</td></tr>
+                    <tr><td><code>nearby_services</code></td><td>Services à proximité</td></tr>
+                    <tr><td><code>emergency_numbers</code></td><td>Numéros d'urgence</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Password Reset Modal -->
+    <div id="resetPasswordModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Réinitialiser le mot de passe</h3>
+                <button class="modal-close" onclick="closeResetPasswordModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 1rem;">Utilisateur: <strong id="resetPasswordEmail"></strong></p>
+                <div class="form-group">
+                    <label for="newPassword" style="display: block; margin-bottom: 0.5rem; color: #ccc;">Nouveau mot de passe</label>
+                    <input type="password" id="newPassword" class="form-control" placeholder="Minimum 8 caractères" style="width: 100%; padding: 0.75rem; background: #0d1117; border: 1px solid #0f3460; border-radius: 6px; color: #eee;">
+                </div>
+                <div class="form-group" style="margin-top: 1rem;">
+                    <label for="confirmPassword" style="display: block; margin-bottom: 0.5rem; color: #ccc;">Confirmer le mot de passe</label>
+                    <input type="password" id="confirmPassword" class="form-control" placeholder="Confirmer le mot de passe" style="width: 100%; padding: 0.75rem; background: #0d1117; border: 1px solid #0f3460; border-radius: 6px; color: #eee;">
+                </div>
+                <div id="resetPasswordError" style="color: #e94560; margin-top: 0.5rem; display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeResetPasswordModal()">Annuler</button>
+                <button class="btn btn-primary" onclick="submitResetPassword()">Réinitialiser</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: #16213e;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 450px;
+            border: 1px solid #0f3460;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #0f3460;
+        }
+        .modal-header h3 {
+            color: #e94560;
+            margin: 0;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+        .modal-close:hover {
+            color: #e94560;
+        }
+        .modal-body {
+            padding: 1.5rem;
+        }
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+            padding: 1rem 1.5rem;
+            border-top: 1px solid #0f3460;
+        }
+        .btn-secondary {
+            background: #333;
+            color: #ccc;
+        }
+        .btn-secondary:hover {
+            background: #444;
+        }
+    </style>
+
+    <script>
+        let currentResetUserId = null;
+
+        function showAlert(message, type) {
+            const container = document.getElementById('alert-container');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            container.appendChild(alert);
+            setTimeout(() => alert.remove(), 5000);
+        }
+
+        function refreshData() {
+            window.location.reload();
+        }
+
+        function refreshSessions() {
+            window.location.reload();
+        }
+
+        async function disconnectSession(tokenPreview, email) {
+            if (!confirm(`Êtes-vous sûr de vouloir déconnecter "${email}" ?`)) {
+                return;
+            }
+            try {
+                const response = await fetch(`/superadmin/api/sessions/${tokenPreview}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    showAlert('Utilisateur déconnecté', 'success');
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showAlert(result.error || 'Erreur', 'error');
+                }
+            } catch (error) {
+                showAlert('Erreur de connexion', 'error');
+            }
+        }
+
+        async function deleteUser(userId, email) {
+            if (!confirm(`Êtes-vous sûr de vouloir supprimer l'utilisateur "${email}" ?`)) {
+                return;
+            }
+            try {
+                const response = await fetch(`/superadmin/api/users/${userId}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    showAlert('Utilisateur supprimé', 'success');
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showAlert(result.error || 'Erreur', 'error');
+                }
+            } catch (error) {
+                showAlert('Erreur de connexion', 'error');
+            }
+        }
+
+        async function deleteProperty(propId, name) {
+            if (!confirm(`Êtes-vous sûr de vouloir supprimer la propriété "${name}" ? Cette action supprimera également toutes les données associées.`)) {
+                return;
+            }
+            try {
+                const response = await fetch(`/superadmin/api/properties/${propId}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    showAlert('Propriété supprimée', 'success');
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showAlert(result.error || 'Erreur', 'error');
+                }
+            } catch (error) {
+                showAlert('Erreur de connexion', 'error');
+            }
+        }
+
+        async function toggleProperty(propId) {
+            try {
+                const response = await fetch(`/superadmin/api/properties/${propId}/toggle`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    showAlert('Statut modifié', 'success');
+                    setTimeout(() => window.location.reload(), 500);
+                } else {
+                    showAlert(result.error || 'Erreur', 'error');
+                }
+            } catch (error) {
+                showAlert('Erreur de connexion', 'error');
+            }
+        }
+
+        async function executeSQL() {
+            const query = document.getElementById('sql-query').value.trim();
+            const resultsDiv = document.getElementById('sql-results');
+
+            if (!query) {
+                resultsDiv.innerHTML = '<pre style="color: #e94560;">Veuillez entrer une requête SQL</pre>';
+                return;
+            }
+
+            try {
+                const response = await fetch('/superadmin/api/sql', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query })
+                });
+                const result = await response.json();
+
+                if (response.ok) {
+                    resultsDiv.innerHTML = `<pre>${JSON.stringify(result.data, null, 2)}</pre>`;
+                } else {
+                    resultsDiv.innerHTML = `<pre style="color: #e94560;">Erreur: ${result.error}</pre>`;
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<pre style="color: #e94560;">Erreur de connexion</pre>`;
+            }
+        }
+
+        function openResetPasswordModal(userId, email) {
+            currentResetUserId = userId;
+            document.getElementById('resetPasswordEmail').textContent = email;
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+            document.getElementById('resetPasswordError').style.display = 'none';
+            document.getElementById('resetPasswordModal').style.display = 'flex';
+        }
+
+        function closeResetPasswordModal() {
+            document.getElementById('resetPasswordModal').style.display = 'none';
+            currentResetUserId = null;
+        }
+
+        async function submitResetPassword() {
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const errorDiv = document.getElementById('resetPasswordError');
+
+            // Validation
+            if (!newPassword || !confirmPassword) {
+                errorDiv.textContent = 'Veuillez remplir tous les champs';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            if (newPassword.length < 8) {
+                errorDiv.textContent = 'Le mot de passe doit contenir au moins 8 caractères';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            if (newPassword !== confirmPassword) {
+                errorDiv.textContent = 'Les mots de passe ne correspondent pas';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/superadmin/api/users/${currentResetUserId}/reset-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: newPassword })
+                });
+                const result = await response.json();
+
+                if (response.ok) {
+                    closeResetPasswordModal();
+                    showAlert('Mot de passe réinitialisé avec succès', 'success');
+                } else {
+                    errorDiv.textContent = result.error || 'Erreur lors de la réinitialisation';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Erreur de connexion';
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        // Close modal on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeResetPasswordModal();
+            }
+        });
+
+        // Close modal on click outside
+        document.getElementById('resetPasswordModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeResetPasswordModal();
+            }
+        });
+
+        // Clear superadmin session on page unload (refresh, close, navigate away)
+        window.addEventListener('beforeunload', function() {
+            // Use synchronous request to ensure logout happens before page unloads
+            navigator.sendBeacon('/superadmin/logout-silent');
+        });
+    </script>
+</body>
+</html>

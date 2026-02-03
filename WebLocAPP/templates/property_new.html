@@ -1,0 +1,424 @@
+{% extends "base.html" %}
+
+{% block title %}Nouvelle Propriété - LocApp{% endblock %}
+
+{% block extra_head %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+/* Map container with smooth transitions */
+#map-wrapper {
+    height: 300px;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+}
+
+#map-placeholder {
+    position: absolute;
+    inset: 0;
+    background: #f3f4f6;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #9ca3af;
+    transition: opacity 0.3s ease;
+    z-index: 2;
+}
+
+#map-placeholder.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+#map {
+    width: 100%;
+    height: 100%;
+}
+
+.leaflet-container {
+    background: #e5e7eb;
+}
+
+/* Loading spinner */
+.geocoding-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid #e5e7eb;
+    border-top-color: #6366f1;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 800px; margin: 0 auto;">
+    <div class="card-header">
+        <h2 class="card-title">Créer une nouvelle propriété</h2>
+    </div>
+
+    <form id="newPropertyForm">
+        <div class="form-group">
+            <label class="form-label" for="property_name">Nom de la propriété *</label>
+            <input type="text" class="form-control" id="property_name" name="name" required
+                   placeholder="Ex: Appartement Paris 15, Maison de vacances Bretagne...">
+            <small style="color: #6b7280;">Ce nom sera affiché dans la liste de vos propriétés</small>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="property_address">Adresse complète *</label>
+            <input type="text" class="form-control" id="property_address" name="address" required
+                   placeholder="Ex: 15 rue de la Paix, 75002 Paris">
+            <small style="color: #6b7280;">Saisissez l'adresse pour afficher la localisation sur la carte</small>
+        </div>
+
+        <!-- Map Container -->
+        <div class="form-group">
+            <label class="form-label">Localisation</label>
+            <div id="map-wrapper">
+                <div id="map-placeholder">
+                    <span style="font-size: 3rem;">🗺️</span>
+                    <p>La carte s'affichera une fois l'adresse saisie</p>
+                </div>
+                <div id="map"></div>
+            </div>
+            <div id="geocoding-status" style="margin-top: 0.5rem; font-size: 0.875rem; color: #6b7280;"></div>
+        </div>
+
+        <!-- Hidden fields for coordinates and location data -->
+        <input type="hidden" id="property_lat" name="latitude">
+        <input type="hidden" id="property_lng" name="longitude">
+        <input type="hidden" id="property_display_name" name="display_name">
+        <input type="hidden" id="property_region" name="region">
+
+        <div class="form-group">
+            <label class="form-label" for="property_icon">Icône (optionnel)</label>
+            <select class="form-control" id="property_icon" name="icon">
+                <option value="🏠">🏠 Maison</option>
+                <option value="🏡">🏡 Maison avec jardin</option>
+                <option value="🏢">🏢 Immeuble</option>
+                <option value="🏨">🏨 Hôtel</option>
+                <option value="🏖️">🏖️ Bord de mer</option>
+                <option value="🏔️">🏔️ Montagne</option>
+                <option value="🌲">🌲 Campagne</option>
+                <option value="🏰">🏰 Château</option>
+                <option value="🛖">🛖 Chalet</option>
+            </select>
+        </div>
+
+        <div class="creation-options" style="margin-top: 2rem;">
+            <div class="creation-option">
+                <button type="submit" class="btn btn-primary btn-large" id="submitBtn" disabled>
+                    <span>📋</span> Créer ma propriété
+                </button>
+                <p class="option-desc">Création basée sur un modèle que vous personnaliserez ensuite</p>
+            </div>
+
+            <div class="btn-separator">ou</div>
+
+            <div class="creation-option">
+                <button type="button" class="btn btn-ai btn-large" id="aiBtn" disabled onclick="generateWithAI()">
+                    <span>✨</span> Générer avec l'IA
+                </button>
+                <p class="option-desc">L'IA génère automatiquement le contenu basé sur l'adresse</p>
+            </div>
+        </div>
+    </form>
+</div>
+
+<style>
+.btn-ai {
+    background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 50%, #4f46e5 100%);
+    color: white;
+    border: none;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.btn-ai:hover:not(:disabled) {
+    background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 50%, #4338ca 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+}
+
+.btn-ai:disabled {
+    background: linear-gradient(135deg, #a5b4fc 0%, #c4b5fd 100%);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.btn-ai span { margin-right: 0.5rem; }
+
+.btn-large {
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.btn-separator {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    color: #9ca3af;
+    font-size: 0.875rem;
+}
+
+.btn-separator::before,
+.btn-separator::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #e5e7eb;
+}
+
+.creation-options {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.creation-option { text-align: center; }
+.creation-option .btn-large { width: 100%; }
+
+.option-desc {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let map = null;
+let marker = null;
+let geocodingTimeout = null;
+const addressInput = document.getElementById('property_address');
+const statusEl = document.getElementById('geocoding-status');
+const placeholder = document.getElementById('map-placeholder');
+
+// Initialize map immediately (hidden behind placeholder)
+function initializeMap() {
+    if (map) return;
+
+    map = L.map('map', {
+        center: [46.603354, 1.888334], // France center
+        zoom: 5,
+        zoomControl: true
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+    }).addTo(map);
+}
+
+// Show map with coordinates
+function showMap(lat, lng) {
+    placeholder.classList.add('hidden');
+
+    if (!map) initializeMap();
+
+    map.setView([lat, lng], 15, { animate: true });
+
+    if (marker) {
+        marker.setLatLng([lat, lng]);
+    } else {
+        marker = L.marker([lat, lng]).addTo(map);
+    }
+
+    // Ensure proper size calculation
+    setTimeout(() => map.invalidateSize(), 50);
+
+    // Store coordinates
+    document.getElementById('property_lat').value = lat;
+    document.getElementById('property_lng').value = lng;
+
+    // Enable buttons
+    document.getElementById('submitBtn').disabled = !document.getElementById('property_name').value.trim();
+    document.getElementById('aiBtn').disabled = false;
+}
+
+// Debounced geocoding
+function debounceGeocoding() {
+    clearTimeout(geocodingTimeout);
+    const address = addressInput.value.trim();
+
+    if (address.length < 5) {
+        statusEl.textContent = '';
+        return;
+    }
+
+    statusEl.innerHTML = '<span class="geocoding-spinner"></span>Recherche...';
+
+    geocodingTimeout = setTimeout(() => geocodeAddress(address), 500);
+}
+
+// Geocode address
+async function geocodeAddress(address) {
+    try {
+        const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&addressdetails=1`,
+            { headers: { 'Accept-Language': 'fr' } }
+        );
+
+        const data = await response.json();
+
+        if (data?.length > 0) {
+            const { lat, lon, display_name, address: addressDetails } = data[0];
+
+            // Extract region from address details (department, state, or county)
+            let region = '';
+            if (addressDetails) {
+                // Priority: département > state > county > city
+                region = addressDetails.county || addressDetails.state || addressDetails.department || addressDetails.city || '';
+            }
+
+            // Store the full display name and region
+            document.getElementById('property_display_name').value = display_name;
+            document.getElementById('property_region').value = region;
+
+            statusEl.innerHTML = `<span style="color: #10b981;">✓ ${display_name.substring(0, 60)}...</span>`;
+            if (region) {
+                statusEl.innerHTML += `<br><small style="color: #6b7280;">Région: ${region}</small>`;
+            }
+            showMap(parseFloat(lat), parseFloat(lon));
+        } else {
+            statusEl.innerHTML = '<span style="color: #ef4444;">✗ Adresse non trouvée</span>';
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('aiBtn').disabled = true;
+            document.getElementById('property_display_name').value = '';
+            document.getElementById('property_region').value = '';
+        }
+    } catch (e) {
+        statusEl.innerHTML = '<span style="color: #ef4444;">✗ Erreur de recherche</span>';
+    }
+}
+
+// Event listeners
+addressInput.addEventListener('input', debounceGeocoding);
+
+document.getElementById('property_name').addEventListener('input', function() {
+    const hasCoords = document.getElementById('property_lat').value;
+    document.getElementById('submitBtn').disabled = !(this.value.trim() && hasCoords);
+});
+
+// Form submission
+document.getElementById('newPropertyForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const name = document.getElementById('property_name').value.trim();
+    const address = addressInput.value.trim();
+    const icon = document.getElementById('property_icon').value;
+    const lat = document.getElementById('property_lat').value;
+    const lng = document.getElementById('property_lng').value;
+    const displayName = document.getElementById('property_display_name').value;
+    const region = document.getElementById('property_region').value;
+
+    if (!name || !address || !lat || !lng) {
+        showAlert('Veuillez remplir tous les champs et valider l\'adresse', 'error');
+        return;
+    }
+
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="geocoding-spinner"></span> Création...';
+
+    try {
+        const response = await fetch('/api/properties', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name,
+                address,
+                icon,
+                latitude: lat,
+                longitude: lng,
+                display_name: displayName,
+                region: region
+            })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showAlert('Propriété créée avec succès!', 'success');
+            localStorage.setItem('locapp_current_property', result.id);
+            setTimeout(() => window.location.href = '/general?property_id=' + result.id, 1000);
+        } else {
+            showAlert('Erreur: ' + (result.error || 'Échec'), 'error');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<span>📋</span> Créer ma propriété';
+        }
+    } catch (e) {
+        showAlert('Erreur de connexion', 'error');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>📋</span> Créer ma propriété';
+    }
+});
+
+// AI Generation
+async function generateWithAI() {
+    const address = addressInput.value.trim();
+    const lat = document.getElementById('property_lat').value;
+    const lng = document.getElementById('property_lng').value;
+    const displayName = document.getElementById('property_display_name').value;
+    const region = document.getElementById('property_region').value;
+
+    if (!address || !lat || !lng) {
+        showAlert('Veuillez d\'abord valider une adresse', 'error');
+        return;
+    }
+
+    const aiBtn = document.getElementById('aiBtn');
+    aiBtn.disabled = true;
+    aiBtn.innerHTML = '<span class="geocoding-spinner"></span> Génération...';
+
+    try {
+        const response = await fetch('/api/properties/generate-ai', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                address,
+                latitude: lat,
+                longitude: lng,
+                display_name: displayName,
+                region: region
+            })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showAlert('Propriété générée!', 'success');
+            localStorage.setItem('locapp_current_property', result.id);
+            setTimeout(() => window.location.href = '/general?property_id=' + result.id, 1000);
+        } else {
+            showAlert('Erreur: ' + (result.error || 'Échec'), 'error');
+            aiBtn.disabled = false;
+            aiBtn.innerHTML = '<span>✨</span> Générer avec l\'IA';
+        }
+    } catch (e) {
+        showAlert('Erreur de connexion', 'error');
+        aiBtn.disabled = false;
+        aiBtn.innerHTML = '<span>✨</span> Générer avec l\'IA';
+    }
+}
+
+// Pre-initialize map for instant display
+initializeMap();
+</script>
+{% endblock %}

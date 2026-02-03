@@ -1,0 +1,133 @@
+{% extends "commercial/base_commercial.html" %}
+
+{% block title %}Démo - LocAPP{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="section" style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); padding-top: 4rem;">
+    <div class="section-container">
+        <div class="section-header">
+            <h2>Découvrez LocAPP en action</h2>
+            <p>Regardez comment LocAPP simplifie la vie des propriétaires et améliore l'expérience des voyageurs</p>
+        </div>
+    </div>
+</section>
+
+<!-- Video Section -->
+<section class="section">
+    <div class="section-container">
+        <div class="demo-container">
+            <div class="video-wrapper">
+                <!-- Placeholder for video - Replace VIDEO_ID with actual YouTube video ID -->
+                <div class="video-placeholder" onclick="loadVideo()" id="videoPlaceholder">
+                    <div class="play-button">▶</div>
+                    <p>Cliquez pour lancer la démonstration</p>
+                </div>
+                <iframe
+                    id="videoFrame"
+                    style="display: none;"
+                    src=""
+                    title="Démonstration LocAPP"
+                    frameborder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowfullscreen>
+                </iframe>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Demo Features -->
+<section class="section section-light">
+    <div class="section-container">
+        <div class="section-header">
+            <h2>Ce que vous allez découvrir</h2>
+            <p>Un aperçu complet des fonctionnalités de LocAPP</p>
+        </div>
+        <div class="steps-grid">
+            <div class="step-card">
+                <div class="step-number">1</div>
+                <h3>Création d'une propriété</h3>
+                <p>Voyez comment configurer votre première location en quelques minutes seulement.</p>
+            </div>
+            <div class="step-card">
+                <div class="step-number">2</div>
+                <h3>Configuration du WiFi</h3>
+                <p>Découvrez la génération automatique du QR Code WiFi et son fonctionnement.</p>
+            </div>
+            <div class="step-card">
+                <div class="step-number">3</div>
+                <h3>Ajout des activités</h3>
+                <p>Apprenez à partager vos meilleures recommandations locales avec vos voyageurs.</p>
+            </div>
+            <div class="step-card">
+                <div class="step-number">4</div>
+                <h3>Expérience voyageur</h3>
+                <p>Visualisez exactement ce que verront vos invités sur leur smartphone.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Live Demo -->
+<section class="section">
+    <div class="section-container">
+        <div class="section-header">
+            <h2>Essayez par vous-même</h2>
+            <p>Scannez ce QR Code pour voir un exemple de page voyageur</p>
+        </div>
+        <div style="text-align: center;">
+            <div style="background: white; padding: 2rem; border-radius: 1rem; display: inline-block; box-shadow: var(--shadow-lg);">
+                <div style="width: 200px; height: 200px; background: #f3f4f6; border-radius: 0.5rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
+                    <span style="font-size: 4rem;">📱</span>
+                </div>
+                <p style="color: var(--text-light); font-size: 0.875rem;">QR Code de démonstration</p>
+            </div>
+            <p style="margin-top: 2rem; color: var(--text-light);">Ou visitez directement : <a href="#" style="color: var(--primary-color); font-weight: 500;">demo.locapp.fr</a></p>
+        </div>
+    </div>
+</section>
+
+<!-- Testimonial -->
+<section class="section section-light">
+    <div class="section-container">
+        <div style="max-width: 700px; margin: 0 auto; text-align: center;">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">💬</div>
+            <p style="font-size: 1.5rem; font-style: italic; color: var(--text-color); margin-bottom: 2rem;">"J'ai configuré mes 3 appartements en moins d'une heure. Le gain de temps est énorme et mes voyageurs adorent avoir toutes les infos sur leur téléphone."</p>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 1rem;">
+                <div style="width: 56px; height: 56px; background: var(--bg-light); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">👨</div>
+                <div style="text-align: left;">
+                    <p style="font-weight: 600; margin-bottom: 0.25rem;">Pierre M.</p>
+                    <p style="color: var(--text-light); font-size: 0.875rem;">Propriétaire à Bordeaux</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+    <h2>Prêt à essayer ?</h2>
+    <p>Créez votre compte gratuitement et configurez votre première propriété en quelques minutes.</p>
+    <div class="hero-buttons" style="justify-content: center;">
+        <a href="{{ url_for('login') }}" class="btn btn-secondary btn-large">Créer mon compte gratuit</a>
+        <a href="{{ url_for('commercial_features') }}" class="btn btn-outline btn-large" style="border-color: white; color: white;">En savoir plus</a>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function loadVideo() {
+    const placeholder = document.getElementById('videoPlaceholder');
+    const frame = document.getElementById('videoFrame');
+
+    // Replace with your actual YouTube video ID
+    const videoId = 'dQw4w9WgXcQ'; // Placeholder video ID - replace with actual demo video
+
+    frame.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+    placeholder.style.display = 'none';
+    frame.style.display = 'block';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,491 @@
+{% extends "base.html" %}
+
+{% block title %}Photos - Administration LocApp{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+    <div class="admin-form-section" style="max-width: 100%;">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Photos de la propriété</h2>
+            </div>
+
+            <!-- Zone d'upload -->
+            <div class="upload-zone" id="uploadZone">
+                <div class="upload-icon">📷</div>
+                <p class="upload-text">Glissez-déposez vos photos ici</p>
+                <p class="upload-subtext">ou cliquez pour sélectionner des fichiers</p>
+                <p class="upload-hint">Formats acceptés: PNG, JPG, JPEG, GIF, WEBP (max 16 MB)</p>
+                <input type="file" id="fileInput" multiple accept="image/*" style="display: none;">
+            </div>
+
+            <!-- Barre de progression -->
+            <div class="upload-progress" id="uploadProgress" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <span class="progress-text" id="progressText">Upload en cours...</span>
+            </div>
+
+            <!-- Galerie photos -->
+            <div class="photos-gallery" id="photosGallery">
+                <p class="loading-text">Chargement des photos...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal pour éditer une photo -->
+<div class="modal" id="editPhotoModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Modifier la photo</h3>
+            <button class="modal-close" onclick="closeEditModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <img id="editPhotoPreview" src="" alt="Preview" style="max-width: 100%; border-radius: 8px; margin-bottom: 1rem;">
+            <div class="form-group">
+                <label class="form-label" for="photoTitle">Titre</label>
+                <input type="text" class="form-control" id="photoTitle" placeholder="Titre de la photo">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="photoDescription">Description</label>
+                <textarea class="form-control" id="photoDescription" rows="3" placeholder="Description de la photo"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeEditModal()">Annuler</button>
+            <button class="btn btn-primary" onclick="savePhotoEdit()">Enregistrer</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.upload-zone {
+    border: 2px dashed var(--border-color);
+    border-radius: 12px;
+    padding: 3rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 2rem;
+    background: var(--card-bg);
+}
+
+.upload-zone:hover,
+.upload-zone.dragover {
+    border-color: var(--primary-color);
+    background: rgba(var(--primary-rgb), 0.05);
+}
+
+.upload-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.upload-text {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--text-color);
+    margin-bottom: 0.5rem;
+}
+
+.upload-subtext {
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+}
+
+.upload-hint {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.upload-progress {
+    margin-bottom: 2rem;
+}
+
+.progress-bar {
+    height: 8px;
+    background: var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--primary-color);
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.photos-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.photo-card {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.photo-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.photo-card img {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    display: block;
+}
+
+.photo-card-info {
+    padding: 0.75rem;
+}
+
+.photo-card-title {
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--text-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.photo-card-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.photo-card-actions button {
+    flex: 1;
+    padding: 0.4rem;
+    font-size: 0.8rem;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.btn-edit {
+    background: var(--primary-color);
+    color: white;
+}
+
+.btn-edit:hover {
+    opacity: 0.9;
+}
+
+.btn-delete {
+    background: #e74c3c;
+    color: white;
+}
+
+.btn-delete:hover {
+    background: #c0392b;
+}
+
+.loading-text {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 2rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-muted);
+}
+
+.empty-state-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+/* Modal styles */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.show {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--card-bg);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: var(--text-color);
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.modal-close:hover {
+    color: var(--text-color);
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border-color);
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentEditPhotoId = null;
+
+// Initialize upload zone
+const uploadZone = document.getElementById('uploadZone');
+const fileInput = document.getElementById('fileInput');
+
+uploadZone.addEventListener('click', () => fileInput.click());
+
+uploadZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadZone.classList.add('dragover');
+});
+
+uploadZone.addEventListener('dragleave', () => {
+    uploadZone.classList.remove('dragover');
+});
+
+uploadZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    const files = e.dataTransfer.files;
+    handleFiles(files);
+});
+
+fileInput.addEventListener('change', (e) => {
+    handleFiles(e.target.files);
+});
+
+async function handleFiles(files) {
+    const propertyId = getCurrentPropertyId();
+    if (!propertyId) {
+        showAlert('Veuillez sélectionner une propriété', 'error');
+        return;
+    }
+
+    const uploadProgress = document.getElementById('uploadProgress');
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+
+    uploadProgress.style.display = 'block';
+
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+
+        if (!file.type.startsWith('image/')) {
+            showAlert(`${file.name} n'est pas une image`, 'error');
+            continue;
+        }
+
+        progressText.textContent = `Upload de ${file.name} (${i + 1}/${files.length})...`;
+        progressFill.style.width = `${((i) / files.length) * 100}%`;
+
+        const formData = new FormData();
+        formData.append('photo', file);
+
+        try {
+            const response = await fetch(`/api/photos?property_id=${propertyId}`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                showAlert(`Erreur: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            showAlert(`Erreur lors de l'upload de ${file.name}`, 'error');
+        }
+
+        progressFill.style.width = `${((i + 1) / files.length) * 100}%`;
+    }
+
+    uploadProgress.style.display = 'none';
+    progressFill.style.width = '0%';
+    fileInput.value = '';
+
+    showAlert('Photos uploadées avec succès', 'success');
+    loadData();
+}
+
+async function loadData() {
+    const gallery = document.getElementById('photosGallery');
+
+    try {
+        const photos = await fetchAPI('/api/photos');
+
+        if (!photos || photos.length === 0) {
+            gallery.innerHTML = `
+                <div class="empty-state" style="grid-column: 1 / -1;">
+                    <div class="empty-state-icon">📷</div>
+                    <p>Aucune photo pour cette propriété</p>
+                    <p style="font-size: 0.9rem;">Uploadez des photos pour les afficher ici</p>
+                </div>
+            `;
+            return;
+        }
+
+        gallery.innerHTML = photos.map(photo => `
+            <div class="photo-card" data-id="${photo.id}">
+                <img src="/static/uploads/photos/${photo.filename}" alt="${photo.title || photo.original_name}">
+                <div class="photo-card-info">
+                    <div class="photo-card-title">${photo.title || photo.original_name}</div>
+                    <div class="photo-card-actions">
+                        <button class="btn-edit" onclick="editPhoto(${photo.id})">Modifier</button>
+                        <button class="btn-delete" onclick="deletePhoto(${photo.id})">Supprimer</button>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        gallery.innerHTML = '<p class="loading-text">Erreur lors du chargement des photos</p>';
+    }
+}
+
+function editPhoto(photoId) {
+    currentEditPhotoId = photoId;
+
+    fetchAPI(`/api/photos`).then(photos => {
+        const photo = photos.find(p => p.id === photoId);
+        if (photo) {
+            document.getElementById('editPhotoPreview').src = `/static/uploads/photos/${photo.filename}`;
+            document.getElementById('photoTitle').value = photo.title || '';
+            document.getElementById('photoDescription').value = photo.description || '';
+            document.getElementById('editPhotoModal').classList.add('show');
+        }
+    });
+}
+
+function closeEditModal() {
+    document.getElementById('editPhotoModal').classList.remove('show');
+    currentEditPhotoId = null;
+}
+
+async function savePhotoEdit() {
+    if (!currentEditPhotoId) return;
+
+    const propertyId = getCurrentPropertyId();
+    const data = {
+        title: document.getElementById('photoTitle').value,
+        description: document.getElementById('photoDescription').value
+    };
+
+    try {
+        const response = await fetch(`/api/photos/${currentEditPhotoId}?property_id=${propertyId}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showAlert('Photo mise à jour', 'success');
+            closeEditModal();
+            loadData();
+        } else {
+            showAlert(`Erreur: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        showAlert('Erreur lors de la mise à jour', 'error');
+    }
+}
+
+async function deletePhoto(photoId) {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette photo ?')) return;
+
+    const propertyId = getCurrentPropertyId();
+
+    try {
+        const response = await fetch(`/api/photos/${photoId}?property_id=${propertyId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showAlert('Photo supprimée', 'success');
+            loadData();
+        } else {
+            showAlert(`Erreur: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        showAlert('Erreur lors de la suppression', 'error');
+    }
+}
+
+// Close modal on outside click
+document.getElementById('editPhotoModal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) {
+        closeEditModal();
+    }
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeEditModal();
+    }
+});
+
+// Load photos on page load
+loadData();
+</script>
+{% endblock %}

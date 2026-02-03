@@ -1,0 +1,26 @@
+=== PENSE-BETE LOCAPP ===
+
+- revoir la configuration et le bon fonctionnement de la fonction mot de passe oublié
+- rediriger vers la page de connexion si les identifiants sont perdus lors du refresh d'une page admin
+
+=== PROCHAINE ETAPE ===
+
+Continuer la gestion de la création d'une nouvelle propriété :
+
+1. CREATION SANS IA (Template)
+   - Utiliser "Mazet - Demo" comme base/template
+   - L'utilisateur saisit le nom et l'adresse de la propriété
+   - Dupliquer toutes les données de Mazet - Demo vers la nouvelle propriété
+   - L'utilisateur personnalise ensuite manuellement chaque section
+
+2. CREATION AVEC IA (Automatisée)
+   - L'utilisateur saisit uniquement l'adresse de la propriété
+   - L'IA génère automatiquement :
+     * Nom suggéré pour la propriété
+     * Message de bienvenue personnalisé
+     * Activités à proximité (via géolocalisation)
+     * Services à proximité (pharmacies, supermarchés, etc.)
+     * Suggestions de parking
+     * Numéros d'urgence locaux
+   - Utiliser l'API Google Places ou autre pour enrichir les données
+   - Possibilité d'utiliser Claude API pour générer les textes

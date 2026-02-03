@@ -1,0 +1,203 @@
+{% extends "commercial/base_commercial.html" %}
+
+{% block title %}LocAPP - Gestion simplifiée de vos locations saisonnières{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero">
+    <div class="hero-container">
+        <div class="hero-content">
+            <h1>Simplifiez la gestion de vos <span>locations saisonnières</span></h1>
+            <p>Offrez à vos voyageurs une expérience digitale unique avec toutes les informations essentielles accessibles en un scan. WiFi, accès, activités locales... tout est centralisé.</p>
+            <div class="hero-buttons">
+                <a href="{{ url_for('login') }}" class="btn btn-primary btn-large">Commencer gratuitement</a>
+                <a href="{{ url_for('commercial_demo') }}" class="btn btn-secondary btn-large">Voir la démo</a>
+            </div>
+        </div>
+        <div class="hero-visual">
+            <div class="hero-mockup">
+                <div class="mockup-phone">
+                    <div class="mockup-screen">
+                        <div class="mockup-screen-content">
+                            <div class="mockup-header">
+                                <h3>🏡 Le Mazet de BSA</h3>
+                                <p>Bienvenue dans votre location</p>
+                            </div>
+                            <div class="mockup-content">
+                                <div class="mockup-item">
+                                    <span class="mockup-item-icon">📶</span>
+                                    <span class="mockup-item-text">WiFi & Code d'accès</span>
+                                </div>
+                                <div class="mockup-item">
+                                    <span class="mockup-item-icon">🔑</span>
+                                    <span class="mockup-item-text">Instructions d'arrivée</span>
+                                </div>
+                                <div class="mockup-item">
+                                    <span class="mockup-item-icon">🎯</span>
+                                    <span class="mockup-item-text">Activités à proximité</span>
+                                </div>
+                                <div class="mockup-item">
+                                    <span class="mockup-item-icon">🛎️</span>
+                                    <span class="mockup-item-text">Services locaux</span>
+                                </div>
+                                <div class="mockup-item">
+                                    <span class="mockup-item-icon">🆘</span>
+                                    <span class="mockup-item-text">Numéros d'urgence</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Stats Section -->
+<section class="section section-dark">
+    <div class="section-container">
+        <div class="stats-grid">
+            <div class="stat-item">
+                <h3>500+</h3>
+                <p>Propriétés gérées</p>
+            </div>
+            <div class="stat-item">
+                <h3>15 000+</h3>
+                <p>Voyageurs satisfaits</p>
+            </div>
+            <div class="stat-item">
+                <h3>4.9/5</h3>
+                <p>Note moyenne</p>
+            </div>
+            <div class="stat-item">
+                <h3>24/7</h3>
+                <p>Accès aux informations</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- How It Works -->
+<section class="section">
+    <div class="section-container">
+        <div class="section-header">
+            <h2>Comment ça marche ?</h2>
+            <p>En 3 étapes simples, offrez une expérience premium à vos voyageurs</p>
+        </div>
+        <div class="steps-grid">
+            <div class="step-card">
+                <div class="step-number">1</div>
+                <h3>Créez votre espace</h3>
+                <p>Configurez votre propriété en quelques minutes : WiFi, accès, règles de la maison, services à proximité...</p>
+            </div>
+            <div class="step-card">
+                <div class="step-number">2</div>
+                <h3>Générez votre QR Code</h3>
+                <p>Un QR Code unique est créé automatiquement. Imprimez-le et placez-le dans votre location.</p>
+            </div>
+            <div class="step-card">
+                <div class="step-number">3</div>
+                <h3>Vos voyageurs scannent</h3>
+                <p>Un simple scan et vos invités accèdent à toutes les informations essentielles sur leur smartphone.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Preview -->
+<section class="section section-light">
+    <div class="section-container">
+        <div class="section-header">
+            <h2>Tout ce dont vous avez besoin</h2>
+            <p>Une solution complète pour améliorer l'expérience de vos voyageurs</p>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">📶</div>
+                <h3>QR Code WiFi</h3>
+                <p>Vos voyageurs se connectent au WiFi instantanément en scannant le QR Code. Plus besoin de noter le mot de passe.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔑</div>
+                <h3>Instructions d'accès</h3>
+                <p>Codes de portes, boîte à clés, parking... Toutes les informations pour une arrivée en toute autonomie.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🎯</div>
+                <h3>Activités locales</h3>
+                <p>Partagez vos meilleures recommandations : restaurants, visites, randonnées, activités sportives...</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🛎️</div>
+                <h3>Services à proximité</h3>
+                <p>Pharmacie, médecin, supermarché... Toutes les adresses utiles à portée de main.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🆘</div>
+                <h3>Numéros d'urgence</h3>
+                <p>En cas de besoin, vos voyageurs ont accès immédiatement aux contacts importants.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🏠</div>
+                <h3>Multi-propriétés</h3>
+                <p>Gérez plusieurs locations depuis un seul tableau de bord. Idéal pour les gestionnaires.</p>
+            </div>
+        </div>
+        <div class="text-center mt-4">
+            <a href="{{ url_for('commercial_features') }}" class="btn btn-primary">Découvrir toutes les fonctionnalités</a>
+        </div>
+    </div>
+</section>
+
+<!-- Testimonials -->
+<section class="section">
+    <div class="section-container">
+        <div class="section-header">
+            <h2>Ce qu'en pensent nos utilisateurs</h2>
+            <p>Ils ont adopté LocAPP pour leurs locations</p>
+        </div>
+        <div class="testimonials-grid">
+            <div class="testimonial-card">
+                <p class="testimonial-content">"Depuis que j'utilise LocAPP, je ne reçois plus de messages à 23h pour demander le mot de passe WiFi. Mes voyageurs sont autonomes et satisfaits !"</p>
+                <div class="testimonial-author">
+                    <div class="testimonial-avatar">👩</div>
+                    <div class="testimonial-info">
+                        <h4>Marie L.</h4>
+                        <p>3 locations en Ardèche</p>
+                    </div>
+                </div>
+            </div>
+            <div class="testimonial-card">
+                <p class="testimonial-content">"L'interface est intuitive et le résultat côté voyageur est vraiment professionnel. J'ai même reçu des compliments dans mes avis !"</p>
+                <div class="testimonial-author">
+                    <div class="testimonial-avatar">👨</div>
+                    <div class="testimonial-info">
+                        <h4>Thomas B.</h4>
+                        <p>Gîte de charme en Provence</p>
+                    </div>
+                </div>
+            </div>
+            <div class="testimonial-card">
+                <p class="testimonial-content">"Le QR Code WiFi est génial ! Mes voyageurs adorent. Et moi j'adore ne plus avoir à expliquer comment se connecter à chaque arrivée."</p>
+                <div class="testimonial-author">
+                    <div class="testimonial-avatar">👩</div>
+                    <div class="testimonial-info">
+                        <h4>Sophie R.</h4>
+                        <p>5 appartements à Lyon</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section -->
+<section class="cta-section">
+    <h2>Prêt à améliorer l'expérience de vos voyageurs ?</h2>
+    <p>Rejoignez des centaines de propriétaires qui ont déjà simplifié la gestion de leurs locations avec LocAPP.</p>
+    <div class="hero-buttons" style="justify-content: center;">
+        <a href="{{ url_for('login') }}" class="btn btn-secondary btn-large">Créer mon compte gratuit</a>
+        <a href="{{ url_for('commercial_pricing') }}" class="btn btn-outline btn-large" style="border-color: white; color: white;">Voir les tarifs</a>
+    </div>
+</section>
+{% endblock %}

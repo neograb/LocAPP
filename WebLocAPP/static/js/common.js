@@ -16,7 +16,7 @@ const PROPERTY_THEMES = {
 let propertiesCache = null;
 
 function getCurrentPropertyId() {
-    return localStorage.getItem(PROPERTY_KEY) || '1';
+    return localStorage.getItem(PROPERTY_KEY) || null;
 }
 
 function setCurrentPropertyId(propertyId) {
@@ -34,6 +34,9 @@ function setCurrentTheme(theme) {
 
 function getApiUrl(endpoint) {
     const propertyId = getCurrentPropertyId();
+    if (!propertyId) {
+        return endpoint; // No property ID, API will return empty data
+    }
     const separator = endpoint.includes('?') ? '&' : '?';
     return `${endpoint}${separator}property_id=${propertyId}`;
 }
@@ -66,7 +69,9 @@ function applyThemeForProperty(propertyId) {
 // Initialize theme on page load
 function initTheme() {
     const propertyId = getCurrentPropertyId();
-    applyThemeForProperty(propertyId);
+    if (propertyId) {
+        applyThemeForProperty(propertyId);
+    }
 }
 
 // Show alert message
@@ -86,17 +91,9 @@ function showAlert(message, type = 'info') {
     }, 3000);
 }
 
-// Get authentication credentials
+// Get authentication headers (uses session-based auth, no credentials needed)
 function getAuthHeaders() {
-    const username = prompt('Nom d\'utilisateur:');
-    const password = prompt('Mot de passe:');
-
-    if (!username || !password) {
-        return null;
-    }
-
     return {
-        'Authorization': 'Basic ' + btoa(username + ':' + password),
         'Content-Type': 'application/json'
     };
 }
@@ -141,7 +138,13 @@ async function fetchProperties() {
 // Load data into form
 function loadDataIntoForm(data, formId) {
     const form = document.getElementById(formId);
-    if (!form || !data) return;
+    if (!form) return;
+
+    // If no data or empty object, clear the form
+    if (!data || Object.keys(data).length === 0) {
+        form.reset();
+        return;
+    }
 
     Object.keys(data).forEach(key => {
         const input = form.querySelector(`[name="${key}"]`);
@@ -223,13 +226,50 @@ document.addEventListener('click', function(event) {
     }
 });
 
+// Check if user has any properties
+function hasUserProperties() {
+    const selector = document.getElementById('property-selector');
+    if (!selector) return false;
+    const propertyOptions = Array.from(selector.options).filter(opt => opt.value !== 'new' && opt.value !== '');
+    return propertyOptions.length > 0;
+}
+
 // Property selector functions
 function initPropertySelector() {
     const selector = document.getElementById('property-selector');
     if (!selector) return;
 
+    // Check if we're on the new property page
+    const isNewPropertyPage = window.location.pathname === '/property/new';
+
+    if (isNewPropertyPage) {
+        // Keep "Nouvelle Propriété..." selected
+        selector.value = 'new';
+        return;
+    }
+
+    // Check if user has any properties (excluding the "new" option)
+    const propertyOptions = Array.from(selector.options).filter(opt => opt.value !== 'new' && opt.value !== '');
+
+    if (propertyOptions.length === 0) {
+        // User has no properties - clear localStorage
+        localStorage.removeItem(PROPERTY_KEY);
+        console.log('User has no properties - fields will be empty');
+        return;
+    }
+
+    // Get stored property ID
+    let currentPropertyId = localStorage.getItem(PROPERTY_KEY);
+
+    // Verify that the stored property ID exists in user's properties
+    const validPropertyIds = propertyOptions.map(opt => opt.value);
+    if (!currentPropertyId || !validPropertyIds.includes(currentPropertyId)) {
+        // Use first available property
+        currentPropertyId = propertyOptions[0].value;
+        localStorage.setItem(PROPERTY_KEY, currentPropertyId);
+    }
+
     // Set current selection
-    const currentPropertyId = getCurrentPropertyId();
     selector.value = currentPropertyId;
 
     // Apply theme immediately

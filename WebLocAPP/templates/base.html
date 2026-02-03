@@ -4,64 +4,143 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Administration LocApp{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/commercial.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    {% block extra_head %}{% endblock %}
+    <style>
+        /* Adjustments for combined layout */
+        .admin-wrapper {
+            padding-top: 73px; /* Height of navbar */
+        }
+        .app-layout {
+            min-height: calc(100vh - 73px);
+        }
+        .sidebar {
+            top: 73px;
+            height: calc(100vh - 73px);
+        }
+        @media (max-width: 768px) {
+            .sidebar {
+                top: 73px;
+            }
+        }
+        /* Custom nav icon styling */
+        .nav-icon {
+            width: 1.1em;
+            height: 1.1em;
+            vertical-align: middle;
+            margin-right: 0.3em;
+            filter: brightness(0) saturate(100%) invert(67%) sepia(11%) saturate(368%) hue-rotate(182deg) brightness(89%) contrast(87%);
+        }
+        .nav-link:hover .nav-icon {
+            filter: brightness(0) saturate(100%) invert(100%);
+        }
+    </style>
 </head>
 <body data-theme="mazet-bsa">
-    <div class="app-layout">
-        <!-- Sidebar Navigation with Property Selector -->
-        <nav class="sidebar">
-            <!-- Property Selector Section -->
-            <div class="sidebar-property-section">
-                <div class="sidebar-brand">
-                    <span class="brand-icon">🏡</span>
-                    <span class="brand-name">LocApp</span>
-                </div>
-                <div class="property-selector-container">
-                    <label for="property-selector" class="property-label">Propriété</label>
-                    <select id="property-selector" class="property-selector">
-                        {% for prop in properties %}
-                        <option value="{{ prop.id }}" data-theme="{{ prop.theme or prop.slug }}" data-icon="{{ prop.icon }}">
-                            {{ prop.icon }} {{ prop.name }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                    <div class="property-location" id="property-location">
-                        <span class="location-icon">📍</span>
-                        <span class="location-text">Ardèche</span>
+    <!-- Top Navigation Bar (Commercial Site) -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="{{ url_for('commercial_home') }}" class="nav-logo">
+                <span class="logo-icon">🏡</span>
+                <span class="logo-text">LocAPP</span>
+            </a>
+
+            <button class="nav-toggle" onclick="toggleMobileMenu()">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+
+            <ul class="nav-menu" id="navMenu">
+                {% if current_user and current_user.is_authenticated %}
+                <li><a href="{{ url_for('admin_home') }}" class="nav-link" style="background: var(--primary-color); color: white;">Mes locations</a></li>
+                {% endif %}
+                <li><a href="{{ url_for('commercial_features') }}" class="nav-link">Fonctionnalités</a></li>
+                <li><a href="{{ url_for('commercial_pricing') }}" class="nav-link">Tarifs</a></li>
+                <li><a href="{{ url_for('commercial_demo') }}" class="nav-link">Démo</a></li>
+                <!-- TEMPORAIRE: Retirer avant déploiement -->
+                <li><a href="{{ url_for('superadmin_redirect') }}" class="nav-link" style="background: #e94560; color: white;" target="_blank">SuperAdmin</a></li>
+                <!-- FIN TEMPORAIRE -->
+                {% if current_user and current_user.is_authenticated %}
+                <li><a href="{{ url_for('logout') }}" class="nav-link nav-link-secondary">Déconnexion</a></li>
+                {% else %}
+                <li><a href="{{ url_for('login') }}" class="nav-link nav-link-primary">Se connecter</a></li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Admin Content -->
+    <div class="admin-wrapper">
+        <div class="app-layout">
+            <!-- Sidebar Navigation with Property Selector -->
+            <nav class="sidebar">
+                <!-- Property Selector Section -->
+                <div class="sidebar-property-section">
+                    <div class="sidebar-brand">
+                        <span class="brand-icon">📋</span>
+                        <span class="brand-name">Administration</span>
+                    </div>
+                    <div class="property-selector-container">
+                        <label for="property-selector" class="property-label">Propriété</label>
+                        <select id="property-selector" class="property-selector" onchange="handlePropertyChange(this)">
+                            {% for prop in properties %}
+                            <option value="{{ prop.id }}" data-theme="{{ prop.theme or prop.slug }}" data-icon="{{ prop.icon }}" data-region="{{ prop.region or '' }}">
+                                {{ prop.icon }} {{ prop.name }}
+                            </option>
+                            {% endfor %}
+                            <option value="new" data-theme="" data-icon="➕" data-region="" style="border-top: 1px solid #ccc; font-style: italic;">
+                                ➕ Nouvelle Propriété...
+                            </option>
+                        </select>
+                        <div class="property-location" id="property-location">
+                            <span class="location-icon">📍</span>
+                            <span class="location-text" id="property-region-text">-</span>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Navigation Links -->
-            <div class="sidebar-nav-section">
-                <span class="nav-section-title">Administration</span>
-                <ul class="nav-links">
-                    <li><a href="/" class="nav-link">🏠 Accueil</a></li>
-                    <li><a href="/general" class="nav-link">⚙️ Général</a></li>
-                    <li><a href="/wifi" class="nav-link">📶 WiFi</a></li>
-                    <li><a href="/address" class="nav-link">📍 Adresse</a></li>
-                    <li><a href="/access" class="nav-link">🔑 Accès</a></li>
-                    <li><a href="/contact" class="nav-link">📞 Contact</a></li>
-                    <li><a href="/activities" class="nav-link">🎯 Activités</a></li>
-                    <li><a href="/services" class="nav-link">🛎️ Services</a></li>
-                    <li><a href="/parking" class="nav-link">🅿️ Parking</a></li>
-                    <li><a href="/emergency" class="nav-link">🆘 Urgences</a></li>
-                </ul>
-            </div>
+                <!-- Navigation Links -->
+                <div class="sidebar-nav-section">
+                    <span class="nav-section-title">Gestion</span>
+                    <ul class="nav-links">
+                        <li><a href="/" class="nav-link">🏠 Accueil</a></li>
+                        <li><a href="/general" class="nav-link">⚙️ Général</a></li>
+                        <li><a href="/wifi" class="nav-link"><img src="/static/images/wifi-icon.svg" class="nav-icon" alt="WiFi"> WiFi</a></li>
+                        <li><a href="/address" class="nav-link">📍 Adresse</a></li>
+                        <li><a href="/access" class="nav-link">🔑 Accès</a></li>
+                        <li><a href="/contact" class="nav-link">📞 Contact</a></li>
+                        <li><a href="/activities" class="nav-link">🎯 Activités</a></li>
+                        <li><a href="/services" class="nav-link">🛎️ Services</a></li>
+                        <li><a href="/parking" class="nav-link">🅿️ Parking</a></li>
+                        <li><a href="/emergency" class="nav-link">🆘 Urgences</a></li>
+                        <li><a href="/photos" class="nav-link">📷 Photos</a></li>
+                    </ul>
+                </div>
 
-            <!-- Footer -->
-            <div class="sidebar-footer">
-                <span class="version-text">LocApp Admin v1.0</span>
-            </div>
-        </nav>
+                <!-- Footer -->
+                <div class="sidebar-footer">
+                    {% if current_user and current_user.is_authenticated %}
+                    <span class="version-text">Connecté en tant que :</span>
+                    <span class="version-text" style="font-weight: 500;">{{ current_user.email }}</span>
+                    {% else %}
+                    <span class="version-text">LocApp Admin v1.0</span>
+                    {% endif %}
+                </div>
+            </nav>
 
-        <main class="main-content">
-            <button class="sidebar-toggle" onclick="toggleSidebar()">☰</button>
-            <div class="container">
-                <div id="alert-container"></div>
-                {% block content %}{% endblock %}
-            </div>
-        </main>
+            <main class="main-content">
+                <button class="sidebar-toggle" onclick="toggleSidebar()">☰</button>
+                <div class="container">
+                    <div id="alert-container"></div>
+                    {% block content %}{% endblock %}
+                </div>
+            </main>
+        </div>
     </div>
 
     <script src="{{ url_for('static', filename='js/common.js') }}"></script>
@@ -69,6 +148,56 @@
         function toggleSidebar() {
             document.querySelector('.sidebar').classList.toggle('sidebar-open');
         }
+        function toggleMobileMenu() {
+            const navMenu = document.getElementById('navMenu');
+            navMenu.classList.toggle('nav-menu-open');
+        }
+        function updateRegionDisplay(select) {
+            const selectedOption = select.options[select.selectedIndex];
+            const region = selectedOption.dataset.region || '';
+            const regionText = document.getElementById('property-region-text');
+            const locationDiv = document.getElementById('property-location');
+
+            if (region && regionText) {
+                regionText.textContent = region;
+                if (locationDiv) locationDiv.style.display = 'flex';
+            } else if (regionText) {
+                regionText.textContent = '-';
+                if (locationDiv) locationDiv.style.display = 'none';
+            }
+        }
+        function handlePropertyChange(select) {
+            if (select.value === 'new') {
+                window.location.href = '/property/new';
+            } else {
+                // Save the selected property ID
+                localStorage.setItem('locapp_current_property', select.value);
+                // Update region display
+                updateRegionDisplay(select);
+                // If on new property page, redirect to home, otherwise reload
+                if (window.location.pathname === '/property/new') {
+                    window.location.href = '/';
+                } else {
+                    window.location.reload();
+                }
+            }
+        }
+        // Initialize region display on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const propertySelector = document.getElementById('property-selector');
+            if (propertySelector) {
+                // Check if user has no properties (only the "new" option exists)
+                const hasProperties = Array.from(propertySelector.options).some(opt => opt.value !== 'new');
+
+                if (!hasProperties && window.location.pathname !== '/property/new') {
+                    // Redirect to property creation page if user has no properties
+                    window.location.href = '/property/new';
+                    return;
+                }
+
+                updateRegionDisplay(propertySelector);
+            }
+        });
     </script>
     {% block scripts %}{% endblock %}
 </body>

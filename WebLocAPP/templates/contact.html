@@ -10,6 +10,25 @@
                 <h2 class="card-title">Informations de Contact</h2>
             </div>
 
+            <!-- Avatar Section -->
+            <div class="avatar-section">
+                <label class="form-label">Photo de profil</label>
+                <div class="avatar-container">
+                    <div class="avatar-preview" id="avatarPreview">
+                        <img id="avatarImage" src="/static/images/default-avatar.svg" alt="Avatar">
+                        <div class="avatar-overlay" onclick="document.getElementById('avatarInput').click()">
+                            <span>📷</span>
+                        </div>
+                    </div>
+                    <div class="avatar-actions">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('avatarInput').click()">Changer</button>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="deleteAvatar()" id="deleteAvatarBtn" style="display: none;">Supprimer</button>
+                    </div>
+                    <input type="file" id="avatarInput" accept="image/*" style="display: none;" onchange="uploadAvatar(this.files[0])">
+                </div>
+                <p class="form-hint">Formats acceptés: PNG, JPG, JPEG, GIF, WEBP (max 16 MB)</p>
+            </div>
+
             <form id="contactForm">
                 <div class="form-group">
                     <label class="form-label" for="host_name">Nom de l'hôte</label>
@@ -69,8 +88,8 @@
                 <div class="app-content">
                     <div class="preview-content">
                         <div style="text-align: center; margin-bottom: 16px;">
-                            <div style="width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, #fed7aa 0%, #fef08a 100%); display: flex; align-items: center; justify-content: center; margin: 0 auto 8px;">
-                                <span style="font-size: 28px;">👤</span>
+                            <div style="width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, #fed7aa 0%, #fef08a 100%); display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; overflow: hidden;">
+                                <img id="preview-avatar" src="/static/images/default-avatar.svg" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover;">
                             </div>
                             <strong style="font-size: 12px;" id="preview-name">Votre hôte</strong>
                             <p style="font-size: 8px; color: #6b7280;" id="preview-desc">À votre service pour un séjour parfait</p>
@@ -114,7 +133,87 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+.avatar-section {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.avatar-container {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+.avatar-preview {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: linear-gradient(135deg, #fed7aa 0%, #fef08a 100%);
+    cursor: pointer;
+}
+
+.avatar-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.avatar-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.avatar-preview:hover .avatar-overlay {
+    opacity: 1;
+}
+
+.avatar-overlay span {
+    font-size: 24px;
+}
+
+.avatar-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.85rem;
+}
+
+.btn-danger {
+    background: #e74c3c;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c0392b;
+}
+
+.form-hint {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+}
+</style>
 <script>
+let currentAvatarPath = null;
+
 function updatePreview() {
     document.getElementById('preview-name').textContent = document.getElementById('host_name').value || 'Votre hôte';
     document.getElementById('preview-phone').textContent = document.getElementById('phone').value || 'Téléphone';
@@ -133,9 +232,98 @@ async function loadData() {
         const data = await fetchAPI('/api/contact');
         loadDataIntoForm(data, 'contactForm');
         document.getElementById('lastUpdate').textContent = formatDate(data.updated_at);
+
+        // Load avatar
+        if (data.avatar) {
+            currentAvatarPath = data.avatar;
+            const avatarUrl = `/static/uploads/photos/${data.avatar}`;
+            document.getElementById('avatarImage').src = avatarUrl;
+            document.getElementById('preview-avatar').src = avatarUrl;
+            document.getElementById('deleteAvatarBtn').style.display = 'block';
+        } else {
+            currentAvatarPath = null;
+            document.getElementById('avatarImage').src = '/static/images/default-avatar.svg';
+            document.getElementById('preview-avatar').src = '/static/images/default-avatar.svg';
+            document.getElementById('deleteAvatarBtn').style.display = 'none';
+        }
+
         updatePreview();
     } catch (error) {
         showAlert('Erreur lors du chargement des données', 'error');
+    }
+}
+
+async function uploadAvatar(file) {
+    if (!file) return;
+
+    const propertyId = getCurrentPropertyId();
+    if (!propertyId) {
+        showAlert('Veuillez sélectionner une propriété', 'error');
+        return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+        showAlert('Le fichier doit être une image', 'error');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    try {
+        const response = await fetch(`/api/contact/avatar?property_id=${propertyId}`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            currentAvatarPath = result.avatar;
+            const avatarUrl = `/static/uploads/photos/${result.avatar}`;
+            document.getElementById('avatarImage').src = avatarUrl;
+            document.getElementById('preview-avatar').src = avatarUrl;
+            document.getElementById('deleteAvatarBtn').style.display = 'block';
+            showAlert('Avatar mis à jour', 'success');
+        } else {
+            showAlert(`Erreur: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        showAlert('Erreur lors de l\'upload de l\'avatar', 'error');
+    }
+
+    // Reset file input
+    document.getElementById('avatarInput').value = '';
+}
+
+async function deleteAvatar() {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer l\'avatar ?')) return;
+
+    const propertyId = getCurrentPropertyId();
+    if (!propertyId) {
+        showAlert('Veuillez sélectionner une propriété', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/contact/avatar?property_id=${propertyId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            currentAvatarPath = null;
+            document.getElementById('avatarImage').src = '/static/images/default-avatar.svg';
+            document.getElementById('preview-avatar').src = '/static/images/default-avatar.svg';
+            document.getElementById('deleteAvatarBtn').style.display = 'none';
+            showAlert('Avatar supprimé', 'success');
+        } else {
+            showAlert(`Erreur: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        showAlert('Erreur lors de la suppression de l\'avatar', 'error');
     }
 }
 
