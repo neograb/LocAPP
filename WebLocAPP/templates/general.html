@@ -3,6 +3,104 @@
 {% block title %}Informations Générales - Administration LocApp{% endblock %}
 
 {% block content %}
+<style>
+    .header-image-section {
+        margin-top: 2rem;
+        padding-top: 2rem;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    .header-image-preview {
+        width: 100%;
+        max-width: 400px;
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 1rem;
+        background: #f3f4f6;
+        position: relative;
+    }
+
+    .header-image-preview img {
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+
+    .header-image-preview .placeholder {
+        padding: 3rem;
+        text-align: center;
+        color: #9ca3af;
+    }
+
+    .header-image-preview .placeholder span {
+        font-size: 3rem;
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+
+    .image-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .file-input-wrapper {
+        position: relative;
+        overflow: hidden;
+        display: inline-block;
+    }
+
+    .file-input-wrapper input[type="file"] {
+        position: absolute;
+        left: 0;
+        top: 0;
+        opacity: 0;
+        cursor: pointer;
+        width: 100%;
+        height: 100%;
+    }
+
+    .preview-header-image {
+        width: 100%;
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 12px;
+        position: relative;
+    }
+
+    .preview-header-image img {
+        width: 100%;
+        height: 80px;
+        object-fit: cover;
+    }
+
+    .preview-header-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(transparent, rgba(0,0,0,0.7));
+        padding: 12px 8px 6px;
+        color: white;
+        text-align: center;
+    }
+
+    .preview-header-overlay .preview-overlay-title {
+        font-size: 10px;
+        font-weight: 700;
+        display: block;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+
+    .preview-header-overlay .preview-overlay-subtitle {
+        font-size: 7px;
+        opacity: 0.9;
+        display: block;
+        margin-top: 1px;
+        text-shadow: 0 1px 1px rgba(0,0,0,0.5);
+    }
+</style>
+
 <div class="admin-layout">
     <div class="admin-form-section">
         <div class="card">
@@ -37,6 +135,34 @@
                 </div>
             </form>
 
+            <!-- Section Image d'en-tête -->
+            <div class="header-image-section">
+                <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Image d'en-tête</h3>
+                <p style="color: #6b7280; margin-bottom: 1rem; font-size: 0.9rem;">
+                    Cette image remplacera le bandeau avec le nom de la propriété sur la page d'accueil de l'application.
+                </p>
+
+                <div class="header-image-preview" id="headerImagePreview">
+                    <div class="placeholder" id="imagePlaceholder">
+                        <span>🖼️</span>
+                        <p>Aucune image</p>
+                    </div>
+                    <img id="headerImageImg" src="" alt="Image d'en-tête" style="display: none;">
+                </div>
+
+                <div class="image-actions">
+                    <div class="file-input-wrapper">
+                        <button type="button" class="btn btn-primary">Choisir une image</button>
+                        <input type="file" id="headerImageInput" accept="image/png,image/jpeg,image/gif,image/webp" onchange="uploadHeaderImage(this)">
+                    </div>
+                    <button type="button" class="btn btn-danger" id="deleteImageBtn" onclick="deleteHeaderImage()" style="display: none;">Supprimer</button>
+                </div>
+
+                <p style="color: #9ca3af; font-size: 0.8rem; margin-top: 0.5rem;">
+                    Formats acceptés : PNG, JPG, GIF, WebP. Taille recommandée : 800x400px
+                </p>
+            </div>
+
             <div class="info-box" style="margin-top: 2rem;">
                 <strong>Dernière modification:</strong> <span id="lastUpdate">-</span>
             </div>
@@ -53,10 +179,19 @@
                 </div>
                 <div class="app-content">
                     <div class="preview-content">
-                        <div class="preview-header-banner">
+                        <!-- Image d'en-tête ou bandeau par défaut -->
+                        <div id="previewHeaderImage" class="preview-header-image" style="display: none;">
+                            <img id="previewHeaderImg" src="" alt="">
+                            <div class="preview-header-overlay">
+                                <span class="preview-overlay-title" id="preview-overlay-name">Le Mazet de BSA</span>
+                                <span class="preview-overlay-subtitle" id="preview-overlay-location">Bourg-Saint-Andéol • Ardèche</span>
+                            </div>
+                        </div>
+
+                        <div id="previewHeaderBanner" class="preview-header-banner">
                             <span>🏡</span>
                             <strong id="preview-name">Le Mazet de BSA</strong>
-                            <small>Bourg-Saint-Andéol • Ardèche</small>
+                            <small id="preview-location">Bourg-Saint-Andéol • Ardèche</small>
                         </div>
 
                         <div class="preview-welcome">
@@ -95,11 +230,44 @@
 
 {% block scripts %}
 <script>
+let currentHeaderImage = null;
+
 function updatePreview() {
-    document.getElementById('preview-name').textContent = document.getElementById('property_name').value || 'Le Mazet de BSA';
+    const propertyName = document.getElementById('property_name').value || 'Le Mazet de BSA';
+    document.getElementById('preview-name').textContent = propertyName;
+    document.getElementById('preview-overlay-name').textContent = propertyName;
     document.getElementById('preview-title').textContent = document.getElementById('welcome_title').value || 'Bienvenue !';
     document.getElementById('preview-message').textContent = document.getElementById('welcome_message').value || '';
     document.getElementById('preview-description').textContent = document.getElementById('welcome_description').value || '';
+}
+
+function updateHeaderImagePreview(imageUrl) {
+    const placeholder = document.getElementById('imagePlaceholder');
+    const img = document.getElementById('headerImageImg');
+    const deleteBtn = document.getElementById('deleteImageBtn');
+    const previewImage = document.getElementById('previewHeaderImage');
+    const previewImg = document.getElementById('previewHeaderImg');
+    const previewBanner = document.getElementById('previewHeaderBanner');
+
+    if (imageUrl) {
+        placeholder.style.display = 'none';
+        img.src = imageUrl;
+        img.style.display = 'block';
+        deleteBtn.style.display = 'inline-block';
+
+        // Update mobile preview
+        previewImg.src = imageUrl;
+        previewImage.style.display = 'block';
+        previewBanner.style.display = 'none';
+    } else {
+        placeholder.style.display = 'block';
+        img.style.display = 'none';
+        deleteBtn.style.display = 'none';
+
+        // Update mobile preview
+        previewImage.style.display = 'none';
+        previewBanner.style.display = 'block';
+    }
 }
 
 // Update preview on input
@@ -113,8 +281,101 @@ async function loadData() {
         loadDataIntoForm(data, 'generalForm');
         document.getElementById('lastUpdate').textContent = formatDate(data.updated_at);
         updatePreview();
+
+        // Update location from property selector or API data
+        const propertySelector = document.getElementById('property-selector');
+        const selectedOption = propertySelector ? propertySelector.options[propertySelector.selectedIndex] : null;
+        const city = (selectedOption && selectedOption.dataset.city) || data.city || '';
+        const region = (selectedOption && selectedOption.dataset.region) || data.region || '';
+        const locationParts = [];
+        if (city) locationParts.push(city);
+        if (region) locationParts.push(region);
+        const locationText = locationParts.length > 0 ? locationParts.join(' • ') : 'Ville • Région';
+        document.getElementById('preview-location').textContent = locationText;
+        document.getElementById('preview-overlay-location').textContent = locationText;
+
+        // Load header image if exists
+        if (data.header_image) {
+            currentHeaderImage = data.header_image;
+            updateHeaderImagePreview(`/static/uploads/headers/${data.header_image}`);
+        } else {
+            currentHeaderImage = null;
+            updateHeaderImagePreview(null);
+        }
     } catch (error) {
         showAlert('Erreur lors du chargement des données', 'error');
+    }
+}
+
+async function uploadHeaderImage(input) {
+    if (!input.files || !input.files[0]) return;
+
+    const file = input.files[0];
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+        showAlert('L\'image est trop volumineuse (max 5 Mo)', 'error');
+        input.value = '';
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const token = localStorage.getItem('auth_token');
+    const propertyId = getCurrentPropertyId();
+
+    try {
+        const response = await fetch(`/api/general/header-image?property_id=${propertyId}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showAlert(result.message, 'success');
+            currentHeaderImage = result.filename;
+            updateHeaderImagePreview(result.url);
+        } else {
+            showAlert('Erreur: ' + (result.error || 'Échec de l\'upload'), 'error');
+        }
+    } catch (error) {
+        showAlert('Erreur de connexion', 'error');
+    }
+
+    input.value = '';
+}
+
+async function deleteHeaderImage() {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette image ?')) return;
+
+    const token = localStorage.getItem('auth_token');
+    const propertyId = getCurrentPropertyId();
+
+    try {
+        const response = await fetch(`/api/general/header-image?property_id=${propertyId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showAlert(result.message, 'success');
+            currentHeaderImage = null;
+            updateHeaderImagePreview(null);
+        } else {
+            showAlert('Erreur: ' + (result.error || 'Échec de la suppression'), 'error');
+        }
+    } catch (error) {
+        showAlert('Erreur de connexion', 'error');
     }
 }
 

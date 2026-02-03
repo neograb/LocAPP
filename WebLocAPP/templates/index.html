@@ -3,6 +3,47 @@
 {% block title %}Accueil - Administration LocApp{% endblock %}
 
 {% block content %}
+<style>
+    .header-image-container {
+        width: 100%;
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 12px;
+        position: relative;
+    }
+
+    .header-image-container img {
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+
+    .header-image-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(transparent, rgba(0,0,0,0.7));
+        padding: 20px 12px 12px;
+        color: white;
+        text-align: center;
+    }
+
+    .header-image-overlay .overlay-title {
+        font-size: 14px;
+        font-weight: 700;
+        display: block;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    }
+
+    .header-image-overlay .overlay-subtitle {
+        font-size: 10px;
+        opacity: 0.9;
+        display: block;
+        margin-top: 2px;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+</style>
 <div class="simulator-page">
     <div class="simulator-header">
         <h1>Aperçu de l'application</h1>
@@ -26,7 +67,17 @@
                 <div class="app-content">
                     <!-- Accueil Tab -->
                     <div id="tab-accueil" class="tab-content active">
-                        <div class="app-header-card">
+                        <!-- Image d'en-tête personnalisée avec nom en surimpression (si définie) -->
+                        <div id="header-image-container" class="header-image-container" style="display: none;">
+                            <img id="header-image" src="" alt="En-tête">
+                            <div class="header-image-overlay">
+                                <span class="overlay-title" id="overlay-property-name">Chargement...</span>
+                                <span class="overlay-subtitle" id="overlay-property-location"></span>
+                            </div>
+                        </div>
+
+                        <!-- Bandeau par défaut (si pas d'image) -->
+                        <div id="default-header-card" class="app-header-card">
                             <div class="header-decoration">
                                 <span class="deco-icon top-right">🌿</span>
                                 <span class="deco-icon bottom-left">🏛️</span>
@@ -438,6 +489,25 @@ async function loadData() {
         if (mobileLocation) {
             mobileLocation.textContent = locationParts.length > 0 ? locationParts.join(' • ') : '';
         }
+
+        // Handle header image display
+        const headerImageContainer = document.getElementById('header-image-container');
+        const defaultHeaderCard = document.getElementById('default-header-card');
+        const headerImage = document.getElementById('header-image');
+        const locationText = locationParts.length > 0 ? locationParts.join(' • ') : '';
+
+        if (general.header_image) {
+            // Show custom header image with overlay
+            headerImage.src = `/static/uploads/headers/${general.header_image}`;
+            document.getElementById('overlay-property-name').textContent = general.property_name || '';
+            document.getElementById('overlay-property-location').textContent = locationText;
+            headerImageContainer.style.display = 'block';
+            defaultHeaderCard.style.display = 'none';
+        } else {
+            // Show default banner (remove inline style to use CSS class display)
+            headerImageContainer.style.display = 'none';
+            defaultHeaderCard.style.display = '';
+        }
         if (general.welcome_message) {
             document.getElementById('welcome-message').textContent = general.welcome_message;
         }
@@ -481,22 +551,17 @@ async function loadData() {
 
 // Export function
 function downloadExport() {
-    const username = prompt('Nom d\'utilisateur:');
-    const password = prompt('Mot de passe:');
-
-    if (!username || !password) return;
-
     const propertyId = getCurrentPropertyId();
+    const headers = getAuthHeaders();
+
     fetch(`/api/export/download?property_id=${propertyId}`, {
-        headers: {
-            'Authorization': 'Basic ' + btoa(username + ':' + password)
-        }
+        headers: headers
     })
     .then(response => {
         if (response.ok) {
             return response.blob();
         }
-        throw new Error('Authentification échouée');
+        throw new Error('Erreur lors de l\'export');
     })
     .then(blob => {
         const url = window.URL.createObjectURL(blob);

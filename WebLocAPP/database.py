@@ -281,6 +281,12 @@ class Database:
         # Migrate: add region column to properties if it doesn't exist
         self._migrate_add_region_to_properties(cursor, conn)
 
+        # Migrate: add is_available column to amenities if it doesn't exist
+        self._migrate_add_is_available_to_amenities(cursor, conn)
+
+        # Migrate: add header_image column to general_info if it doesn't exist
+        self._migrate_add_header_image_to_general_info(cursor, conn)
+
         conn.close()
 
     def _migrate_add_user_id_to_properties(self, cursor, conn):
@@ -329,6 +335,24 @@ class Database:
 
         if 'region' not in columns:
             cursor.execute('ALTER TABLE properties ADD COLUMN region TEXT')
+            conn.commit()
+
+    def _migrate_add_is_available_to_amenities(self, cursor, conn):
+        """Migration: Add is_available column to amenities if it doesn't exist"""
+        cursor.execute("PRAGMA table_info(amenities)")
+        columns = [col[1] for col in cursor.fetchall()]
+
+        if 'is_available' not in columns:
+            cursor.execute('ALTER TABLE amenities ADD COLUMN is_available BOOLEAN DEFAULT 1')
+            conn.commit()
+
+    def _migrate_add_header_image_to_general_info(self, cursor, conn):
+        """Migration: Add header_image column to general_info if it doesn't exist"""
+        cursor.execute("PRAGMA table_info(general_info)")
+        columns = [col[1] for col in cursor.fetchall()]
+
+        if 'header_image' not in columns:
+            cursor.execute('ALTER TABLE general_info ADD COLUMN header_image TEXT')
             conn.commit()
 
     def _migrate_and_insert_default_data(self, cursor, conn):
@@ -961,6 +985,22 @@ class Database:
                     emergency['display_order']
                 ))
 
+            # 11. Duplicate amenities from template
+            cursor.execute('SELECT * FROM amenities WHERE property_id=?', (template_property_id,))
+            template_amenities = cursor.fetchall()
+            for amenity in template_amenities:
+                cursor.execute('''
+                    INSERT INTO amenities (property_id, category, name, icon, description, display_order)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (
+                    new_property_id,
+                    amenity['category'],
+                    amenity['name'],
+                    amenity['icon'],
+                    amenity['description'],
+                    amenity['display_order']
+                ))
+
             conn.commit()
         except Exception as e:
             conn.rollback()
@@ -1008,6 +1048,30 @@ class Database:
             WHERE id=?
         ''', (data['property_name'], property_id))
 
+        conn.commit()
+        conn.close()
+
+    def update_header_image(self, property_id, image_filename):
+        """Update the header image for a property"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE general_info
+            SET header_image=?, updated_at=CURRENT_TIMESTAMP
+            WHERE property_id=?
+        ''', (image_filename, property_id))
+        conn.commit()
+        conn.close()
+
+    def delete_header_image(self, property_id):
+        """Delete the header image for a property"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE general_info
+            SET header_image=NULL, updated_at=CURRENT_TIMESTAMP
+            WHERE property_id=?
+        ''', (property_id,))
         conn.commit()
         conn.close()
 
@@ -1401,3 +1465,186 @@ class Database:
         cursor.execute('DELETE FROM photos WHERE id=?', (photo_id,))
         conn.commit()
         conn.close()
+
+    # ==================== Amenities (Équipements) ====================
+
+    # Liste des équipements prédéfinis par catégorie
+    DEFAULT_AMENITIES = [
+        # Literie
+        {'category': 'Literie', 'name': 'Lits faits à l\'arrivée', 'icon': '🛏️', 'display_order': 1},
+        {'category': 'Literie', 'name': 'Oreillers', 'icon': '💤', 'display_order': 2},
+        {'category': 'Literie', 'name': 'Couettes', 'icon': '🛋️', 'display_order': 3},
+        {'category': 'Literie', 'name': 'Couvertures supplémentaires', 'icon': '🧣', 'display_order': 4},
+        {'category': 'Literie', 'name': 'Lit bébé', 'icon': '🚒', 'display_order': 5},
+
+        # Salle de bain
+        {'category': 'Salle de bain', 'name': 'Serviettes', 'icon': '🛁', 'display_order': 1},
+        {'category': 'Salle de bain', 'name': 'Sèche-cheveux', 'icon': '💨', 'display_order': 2},
+        {'category': 'Salle de bain', 'name': 'Savon / Gel douche', 'icon': '🧴', 'display_order': 3},
+        {'category': 'Salle de bain', 'name': 'Shampoing', 'icon': '🧴', 'display_order': 4},
+        {'category': 'Salle de bain', 'name': 'Papier toilette', 'icon': '🧻', 'display_order': 5},
+
+        # Cuisine - Électroménager
+        {'category': 'Cuisine - Électroménager', 'name': 'Réfrigérateur', 'icon': '🧊', 'display_order': 1},
+        {'category': 'Cuisine - Électroménager', 'name': 'Congélateur', 'icon': '❄️', 'display_order': 2},
+        {'category': 'Cuisine - Électroménager', 'name': 'Four', 'icon': '♨️', 'display_order': 3},
+        {'category': 'Cuisine - Électroménager', 'name': 'Micro-ondes', 'icon': '⏱️', 'display_order': 4},
+        {'category': 'Cuisine - Électroménager', 'name': 'Plaques de cuisson', 'icon': '🍳', 'display_order': 5},
+        {'category': 'Cuisine - Électroménager', 'name': 'Lave-vaisselle', 'icon': '🍽️', 'display_order': 6},
+        {'category': 'Cuisine - Électroménager', 'name': 'Cafetière', 'icon': '☕', 'display_order': 7},
+        {'category': 'Cuisine - Électroménager', 'name': 'Bouilloire', 'icon': '🫖', 'display_order': 8},
+        {'category': 'Cuisine - Électroménager', 'name': 'Grille-pain', 'icon': '🥪', 'display_order': 9},
+        {'category': 'Cuisine - Électroménager', 'name': 'Mixeur / Blender', 'icon': '🥣', 'display_order': 10},
+
+        # Cuisine - Ustensiles
+        {'category': 'Cuisine - Ustensiles', 'name': 'Casseroles et poêles', 'icon': '🍳', 'display_order': 1},
+        {'category': 'Cuisine - Ustensiles', 'name': 'Vaisselle complète', 'icon': '🍽️', 'display_order': 2},
+        {'category': 'Cuisine - Ustensiles', 'name': 'Couverts', 'icon': '🍴', 'display_order': 3},
+        {'category': 'Cuisine - Ustensiles', 'name': 'Verres et tasses', 'icon': '🥛', 'display_order': 4},
+        {'category': 'Cuisine - Ustensiles', 'name': 'Ustensiles de cuisine', 'icon': '🥄', 'display_order': 5},
+        {'category': 'Cuisine - Ustensiles', 'name': 'Planche à découper', 'icon': '🔪', 'display_order': 6},
+        {'category': 'Cuisine - Ustensiles', 'name': 'Ouvre-bouteille / Tire-bouchon', 'icon': '🍾', 'display_order': 7},
+
+        # Cuisine - Provisions
+        {'category': 'Cuisine - Provisions', 'name': 'Sel et poivre', 'icon': '🧂', 'display_order': 1},
+        {'category': 'Cuisine - Provisions', 'name': 'Huile et vinaigre', 'icon': '🫒', 'display_order': 2},
+        {'category': 'Cuisine - Provisions', 'name': 'Café / Thé', 'icon': '☕', 'display_order': 3},
+        {'category': 'Cuisine - Provisions', 'name': 'Sucre', 'icon': '🧊', 'display_order': 4},
+
+        # Multimédia
+        {'category': 'Multimédia', 'name': 'Télévision', 'icon': '📺', 'display_order': 1},
+        {'category': 'Multimédia', 'name': 'Netflix / Streaming', 'icon': '🎬', 'display_order': 2},
+        {'category': 'Multimédia', 'name': 'Enceinte Bluetooth', 'icon': '🔊', 'display_order': 3},
+        {'category': 'Multimédia', 'name': 'Jeux de société', 'icon': '🎲', 'display_order': 4},
+        {'category': 'Multimédia', 'name': 'Livres', 'icon': '📚', 'display_order': 5},
+
+        # Ménage
+        {'category': 'Ménage', 'name': 'Aspirateur', 'icon': '🧹', 'display_order': 1},
+        {'category': 'Ménage', 'name': 'Balai et pelle', 'icon': '🧹', 'display_order': 2},
+        {'category': 'Ménage', 'name': 'Fer à repasser', 'icon': '👔', 'display_order': 3},
+        {'category': 'Ménage', 'name': 'Lave-linge', 'icon': '🌀', 'display_order': 4},
+        {'category': 'Ménage', 'name': 'Sèche-linge', 'icon': '💨', 'display_order': 5},
+        {'category': 'Ménage', 'name': 'Étendoir', 'icon': '👕', 'display_order': 6},
+        {'category': 'Ménage', 'name': 'Produits ménagers', 'icon': '🧽', 'display_order': 7},
+
+        # Extérieur
+        {'category': 'Extérieur', 'name': 'Terrasse / Balcon', 'icon': '🌳', 'display_order': 1},
+        {'category': 'Extérieur', 'name': 'Jardin', 'icon': '🌿', 'display_order': 2},
+        {'category': 'Extérieur', 'name': 'Barbecue', 'icon': '🔥', 'display_order': 3},
+        {'category': 'Extérieur', 'name': 'Mobilier de jardin', 'icon': '🪑', 'display_order': 4},
+        {'category': 'Extérieur', 'name': 'Piscine', 'icon': '🏊', 'display_order': 5},
+        {'category': 'Extérieur', 'name': 'Parking privé', 'icon': '🅿️', 'display_order': 6},
+        {'category': 'Extérieur', 'name': 'Vélos', 'icon': '🚲', 'display_order': 7},
+
+        # Confort
+        {'category': 'Confort', 'name': 'Climatisation', 'icon': '❄️', 'display_order': 1},
+        {'category': 'Confort', 'name': 'Chauffage', 'icon': '🌡️', 'display_order': 2},
+        {'category': 'Confort', 'name': 'Cheminée', 'icon': '🏠', 'display_order': 3},
+        {'category': 'Confort', 'name': 'Ventilateur', 'icon': '🌀', 'display_order': 4},
+
+        # Sécurité
+        {'category': 'Sécurité', 'name': 'Détecteur de fumée', 'icon': '🚨', 'display_order': 1},
+        {'category': 'Sécurité', 'name': 'Détecteur de CO', 'icon': '🚨', 'display_order': 2},
+        {'category': 'Sécurité', 'name': 'Extincteur', 'icon': '🧯', 'display_order': 3},
+        {'category': 'Sécurité', 'name': 'Trousse de secours', 'icon': '🩹', 'display_order': 4},
+        {'category': 'Sécurité', 'name': 'Coffre-fort', 'icon': '🔐', 'display_order': 5},
+
+        # Famille
+        {'category': 'Famille', 'name': 'Chaise haute', 'icon': '🪑', 'display_order': 1},
+        {'category': 'Famille', 'name': 'Baignoire bébé', 'icon': '🛁', 'display_order': 2},
+        {'category': 'Famille', 'name': 'Jouets enfants', 'icon': '🧸', 'display_order': 3},
+        {'category': 'Famille', 'name': 'Barrière de sécurité', 'icon': '🚧', 'display_order': 4},
+    ]
+
+    def get_all_amenities(self, property_id=1):
+        """Get all amenities for a property"""
+        conn = self.get_connection()
+        results = conn.execute('SELECT * FROM amenities WHERE property_id=? ORDER BY category, display_order', (property_id,)).fetchall()
+        conn.close()
+        return [dict(row) for row in results]
+
+    def get_amenity(self, amenity_id):
+        """Get a single amenity by ID"""
+        conn = self.get_connection()
+        result = conn.execute('SELECT * FROM amenities WHERE id=?', (amenity_id,)).fetchone()
+        conn.close()
+        return dict(result) if result else None
+
+    def initialize_amenities_for_property(self, property_id):
+        """Initialize all default amenities for a property (all unchecked by default)"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        # Check if amenities already exist for this property
+        cursor.execute('SELECT COUNT(*) FROM amenities WHERE property_id=?', (property_id,))
+        if cursor.fetchone()[0] > 0:
+            conn.close()
+            return  # Already initialized
+
+        for amenity in self.DEFAULT_AMENITIES:
+            cursor.execute('''
+                INSERT INTO amenities (property_id, category, name, icon, description, display_order, is_available)
+                VALUES (?, ?, ?, ?, ?, ?, 0)
+            ''', (property_id, amenity['category'], amenity['name'], amenity['icon'], '', amenity['display_order']))
+
+        conn.commit()
+        conn.close()
+
+    def toggle_amenity(self, amenity_id, is_available):
+        """Toggle the availability of an amenity"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE amenities
+            SET is_available=?, updated_at=CURRENT_TIMESTAMP
+            WHERE id=?
+        ''', (1 if is_available else 0, amenity_id))
+        conn.commit()
+        conn.close()
+
+    def create_amenity(self, property_id, data):
+        """Create a new custom amenity"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO amenities (property_id, category, name, icon, description, display_order, is_available)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (property_id, data['category'], data['name'], data.get('icon', ''), data.get('description', ''), data.get('display_order', 0), 1))
+        conn.commit()
+        amenity_id = cursor.lastrowid
+        conn.close()
+        return amenity_id
+
+    def update_amenity(self, amenity_id, data):
+        """Update an amenity"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE amenities
+            SET category=?, name=?, icon=?, description=?, display_order=?, is_available=?, updated_at=CURRENT_TIMESTAMP
+            WHERE id=?
+        ''', (data['category'], data['name'], data.get('icon', ''), data.get('description', ''), data.get('display_order', 0), data.get('is_available', 1), amenity_id))
+        conn.commit()
+        conn.close()
+
+    def delete_amenity(self, amenity_id):
+        """Delete an amenity"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM amenities WHERE id=?', (amenity_id,))
+        conn.commit()
+        conn.close()
+
+    def get_amenity_categories(self, property_id=1):
+        """Get distinct amenity categories for a property"""
+        conn = self.get_connection()
+        results = conn.execute('SELECT DISTINCT category FROM amenities WHERE property_id=? ORDER BY category', (property_id,)).fetchall()
+        conn.close()
+        return [row['category'] for row in results]
+
+    def get_available_amenities(self, property_id=1):
+        """Get only available amenities for a property (for display to guests)"""
+        conn = self.get_connection()
+        results = conn.execute('SELECT * FROM amenities WHERE property_id=? AND is_available=1 ORDER BY category, display_order', (property_id,)).fetchall()
+        conn.close()
+        return [dict(row) for row in results]

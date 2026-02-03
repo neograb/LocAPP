@@ -1,0 +1,560 @@
+{% extends "base.html" %}
+
+{% block title %}Équipements - Administration LocApp{% endblock %}
+
+{% block content %}
+<style>
+    .amenities-grid {
+        display: grid;
+        gap: 1.5rem;
+    }
+
+    .amenity-category {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .category-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid var(--primary-color);
+    }
+
+    .category-header h3 {
+        margin: 0;
+        color: var(--primary-color);
+        font-size: 1.1rem;
+    }
+
+    .category-icon {
+        font-size: 1.5rem;
+    }
+
+    .amenities-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 0.75rem;
+    }
+
+    .amenity-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        background: #f8f9fa;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+
+    .amenity-item:hover {
+        background: #e9ecef;
+    }
+
+    .amenity-item.checked {
+        background: #d4edda;
+        border-left: 3px solid #28a745;
+    }
+
+    .amenity-item.modified {
+        box-shadow: 0 0 0 2px #ffc107;
+    }
+
+    .amenity-checkbox {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+        accent-color: var(--primary-color);
+    }
+
+    .amenity-icon {
+        font-size: 1.2rem;
+        min-width: 28px;
+        text-align: center;
+    }
+
+    .amenity-name {
+        flex: 1;
+        font-size: 0.95rem;
+    }
+
+    .amenity-item.checked .amenity-name {
+        font-weight: 500;
+    }
+
+    .stats-bar {
+        display: flex;
+        gap: 1.5rem;
+        margin-bottom: 1.5rem;
+        padding: 1rem 1.5rem;
+        background: linear-gradient(135deg, var(--primary-color), #c49a6c);
+        border-radius: 12px;
+        color: white;
+        flex-wrap: wrap;
+    }
+
+    .stat-item {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .stat-number {
+        font-size: 1.75rem;
+        font-weight: 700;
+    }
+
+    .stat-label {
+        font-size: 0.85rem;
+        opacity: 0.9;
+    }
+
+    .quick-actions {
+        margin-left: auto;
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .quick-actions button {
+        background: rgba(255,255,255,0.2);
+        border: 1px solid rgba(255,255,255,0.3);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: all 0.2s;
+    }
+
+    .quick-actions button:hover {
+        background: rgba(255,255,255,0.3);
+    }
+
+    .save-button {
+        background: #28a745 !important;
+        border-color: #28a745 !important;
+        font-weight: 600;
+        padding: 0.6rem 1.5rem !important;
+    }
+
+    .save-button:hover {
+        background: #218838 !important;
+    }
+
+    .save-button:disabled {
+        background: rgba(255,255,255,0.3) !important;
+        cursor: not-allowed;
+    }
+
+    .changes-indicator {
+        background: #ffc107;
+        color: #212529;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        display: none;
+    }
+
+    .changes-indicator.visible {
+        display: inline-block;
+    }
+
+    /* Preview mobile styles */
+    .preview-amenity-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 8px;
+        background: #f3f4f6;
+        border-radius: 6px;
+        font-size: 9px;
+    }
+
+    .preview-amenity-icon {
+        font-size: 10px;
+    }
+
+    .preview-category {
+        margin-bottom: 10px;
+    }
+
+    .preview-category-title {
+        font-size: 10px;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .preview-amenities-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+</style>
+
+<div class="admin-layout">
+    <div class="admin-form-section">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Gestion des Équipements</h2>
+            </div>
+
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <span class="stat-number" id="availableCount">0</span>
+                    <span class="stat-label">Équipements disponibles</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="totalCount">0</span>
+                    <span class="stat-label">Total</span>
+                </div>
+                <div class="quick-actions">
+                    <span class="changes-indicator" id="changesIndicator">Modifications non enregistrées</span>
+                    <button onclick="selectAll()">Tout cocher</button>
+                    <button onclick="deselectAll()">Tout décocher</button>
+                    <button class="save-button" id="saveButton" onclick="saveChanges()" disabled>Enregistrer</button>
+                </div>
+            </div>
+
+            <div id="amenitiesContainer" class="amenities-grid">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="admin-preview-section">
+        <p class="preview-title">Aperçu mobile - Équipements</p>
+        <div class="mini-iphone">
+            <div class="iphone-notch"></div>
+            <div class="iphone-screen">
+                <div class="status-bar">
+                    <span>Équipements</span>
+                </div>
+                <div class="app-content">
+                    <div class="preview-content" style="padding: 12px;">
+                        <div style="text-align: center; margin-bottom: 12px;">
+                            <strong style="font-size: 11px;">Équipements disponibles</strong>
+                            <p style="font-size: 8px; color: #6b7280;">Ce que vous trouverez sur place</p>
+                        </div>
+                        <div id="preview-amenities">
+                            <!-- Filled by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let amenities = [];
+let originalStates = {};  // Store original states to track changes
+let hasChanges = false;
+
+const categoryOrder = [
+    'Literie',
+    'Salle de bain',
+    'Cuisine - Électroménager',
+    'Cuisine - Ustensiles',
+    'Cuisine - Provisions',
+    'Multimédia',
+    'Ménage',
+    'Extérieur',
+    'Confort',
+    'Sécurité',
+    'Famille'
+];
+
+const categoryIcons = {
+    'Literie': '🛏️',
+    'Salle de bain': '🚿',
+    'Cuisine - Électroménager': '🍳',
+    'Cuisine - Ustensiles': '🍽️',
+    'Cuisine - Provisions': '🧂',
+    'Multimédia': '📺',
+    'Ménage': '🧹',
+    'Extérieur': '🌳',
+    'Confort': '✨',
+    'Sécurité': '🔒',
+    'Famille': '👶'
+};
+
+async function loadAmenities() {
+    try {
+        amenities = await fetchAPI('/api/amenities');
+        // Store original states
+        originalStates = {};
+        amenities.forEach(a => {
+            originalStates[a.id] = a.is_available ? true : false;
+        });
+        hasChanges = false;
+        updateUI();
+        renderAmenities();
+        updateStats();
+        updatePreview();
+    } catch (error) {
+        showAlert('Erreur lors du chargement des équipements', 'error');
+    }
+}
+
+function updateUI() {
+    const saveBtn = document.getElementById('saveButton');
+    const indicator = document.getElementById('changesIndicator');
+
+    if (hasChanges) {
+        saveBtn.disabled = false;
+        indicator.classList.add('visible');
+    } else {
+        saveBtn.disabled = true;
+        indicator.classList.remove('visible');
+    }
+}
+
+function checkForChanges() {
+    hasChanges = amenities.some(a => {
+        const original = originalStates[a.id];
+        const current = a.is_available ? true : false;
+        return original !== current;
+    });
+    updateUI();
+}
+
+function updateStats() {
+    const available = amenities.filter(a => a.is_available).length;
+    document.getElementById('availableCount').textContent = available;
+    document.getElementById('totalCount').textContent = amenities.length;
+}
+
+function updatePreview() {
+    const previewContainer = document.getElementById('preview-amenities');
+    const availableAmenities = amenities.filter(a => a.is_available);
+
+    if (availableAmenities.length === 0) {
+        previewContainer.innerHTML = `
+            <div style="text-align: center; color: #9ca3af; padding: 20px;">
+                <span style="font-size: 24px;">🛋️</span>
+                <p style="font-size: 9px; margin-top: 8px;">Aucun équipement sélectionné</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Group by category
+    const grouped = {};
+    availableAmenities.forEach(amenity => {
+        if (!grouped[amenity.category]) {
+            grouped[amenity.category] = [];
+        }
+        grouped[amenity.category].push(amenity);
+    });
+
+    let html = '';
+    const categories = Object.keys(grouped).slice(0, 4);
+
+    categories.forEach(category => {
+        const icon = categoryIcons[category] || '📦';
+        const items = grouped[category].slice(0, 4);
+
+        html += `
+            <div class="preview-category">
+                <div class="preview-category-title">
+                    <span>${icon}</span>
+                    <span>${category.replace(' - ', ' ')}</span>
+                </div>
+                <div class="preview-amenities-list">
+                    ${items.map(a => `
+                        <div class="preview-amenity-item">
+                            <span class="preview-amenity-icon">${a.icon || ''}</span>
+                            <span>${a.name}</span>
+                        </div>
+                    `).join('')}
+                    ${grouped[category].length > 4 ? `<span style="font-size: 8px; color: #6b7280;">+${grouped[category].length - 4}</span>` : ''}
+                </div>
+            </div>
+        `;
+    });
+
+    if (Object.keys(grouped).length > 4) {
+        html += `<p style="font-size: 8px; color: #6b7280; text-align: center; margin-top: 8px;">+ ${Object.keys(grouped).length - 4} autres catégories</p>`;
+    }
+
+    previewContainer.innerHTML = html;
+}
+
+function renderAmenities() {
+    const container = document.getElementById('amenitiesContainer');
+
+    if (amenities.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">🛋️</div>
+                <div class="empty-state-text">Chargement des équipements...</div>
+            </div>
+        `;
+        return;
+    }
+
+    // Group by category
+    const grouped = {};
+    amenities.forEach(amenity => {
+        if (!grouped[amenity.category]) {
+            grouped[amenity.category] = [];
+        }
+        grouped[amenity.category].push(amenity);
+    });
+
+    // Sort categories by predefined order
+    const sortedCategories = Object.keys(grouped).sort((a, b) => {
+        const indexA = categoryOrder.indexOf(a);
+        const indexB = categoryOrder.indexOf(b);
+        if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+        if (indexA === -1) return 1;
+        if (indexB === -1) return -1;
+        return indexA - indexB;
+    });
+
+    let html = '';
+    sortedCategories.forEach(category => {
+        const icon = categoryIcons[category] || '📦';
+        const items = grouped[category];
+        const checkedCount = items.filter(a => a.is_available).length;
+
+        html += `
+            <div class="amenity-category">
+                <div class="category-header">
+                    <span class="category-icon">${icon}</span>
+                    <h3>${category}</h3>
+                    <span style="margin-left: auto; font-size: 0.85rem; color: #6b7280;">${checkedCount}/${items.length}</span>
+                </div>
+                <div class="amenities-list">
+        `;
+
+        items.forEach(amenity => {
+            const isChecked = amenity.is_available ? 'checked' : '';
+            const isModified = originalStates[amenity.id] !== (amenity.is_available ? true : false) ? 'modified' : '';
+            html += `
+                <label class="amenity-item ${isChecked} ${isModified}" data-id="${amenity.id}">
+                    <input type="checkbox" class="amenity-checkbox"
+                           ${isChecked}
+                           onchange="toggleAmenity(${amenity.id}, this.checked)">
+                    <span class="amenity-icon">${amenity.icon || ''}</span>
+                    <span class="amenity-name">${amenity.name}</span>
+                </label>
+            `;
+        });
+
+        html += `
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+function toggleAmenity(id, isAvailable) {
+    // Update local data only (no server call)
+    const amenity = amenities.find(a => a.id === id);
+    if (amenity) {
+        amenity.is_available = isAvailable ? 1 : 0;
+    }
+
+    // Update UI
+    const item = document.querySelector(`.amenity-item[data-id="${id}"]`);
+    if (item) {
+        if (isAvailable) {
+            item.classList.add('checked');
+        } else {
+            item.classList.remove('checked');
+        }
+        // Check if modified
+        if (originalStates[id] !== isAvailable) {
+            item.classList.add('modified');
+        } else {
+            item.classList.remove('modified');
+        }
+    }
+
+    checkForChanges();
+    updateStats();
+    updatePreview();
+    renderAmenities();  // Re-render to update counters
+}
+
+function selectAll() {
+    amenities.forEach(a => a.is_available = 1);
+    checkForChanges();
+    renderAmenities();
+    updateStats();
+    updatePreview();
+}
+
+function deselectAll() {
+    amenities.forEach(a => a.is_available = 0);
+    checkForChanges();
+    renderAmenities();
+    updateStats();
+    updatePreview();
+}
+
+async function saveChanges() {
+    const headers = getAuthHeaders();
+    if (!headers) return;
+
+    const saveBtn = document.getElementById('saveButton');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Enregistrement...';
+
+    // Build the amenities status object
+    const amenitiesStatus = {};
+    amenities.forEach(a => {
+        amenitiesStatus[a.id] = a.is_available ? true : false;
+    });
+
+    const propertyId = getCurrentPropertyId();
+
+    try {
+        const response = await fetch(`/api/amenities/bulk-update?property_id=${propertyId}`, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({ amenities: amenitiesStatus })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            // Update original states
+            amenities.forEach(a => {
+                originalStates[a.id] = a.is_available ? true : false;
+            });
+            hasChanges = false;
+            updateUI();
+            renderAmenities();
+            showAlert('Équipements enregistrés avec succès', 'success');
+        } else {
+            showAlert('Erreur: ' + (result.error || 'Échec de l\'enregistrement'), 'error');
+        }
+    } catch (error) {
+        showAlert('Erreur de connexion', 'error');
+    } finally {
+        saveBtn.textContent = 'Enregistrer';
+        saveBtn.disabled = !hasChanges;
+    }
+}
+
+// Load data on page load
+loadAmenities();
+</script>
+{% endblock %}

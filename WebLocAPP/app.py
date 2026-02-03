@@ -692,6 +692,12 @@ def photos_page():
     properties = get_user_properties(current_user)
     return render_template('photos.html', properties=properties, current_user=current_user)
 
+@app.route('/equipements')
+def equipements_page():
+    current_user = get_current_user()
+    properties = get_user_properties(current_user)
+    return render_template('equipements.html', properties=properties, current_user=current_user)
+
 # API Routes - Properties
 @app.route('/api/properties', methods=['GET'])
 def get_properties():
@@ -795,6 +801,77 @@ def update_general_info():
     data = request.json
     db.update_general_info(property_id, data)
     return jsonify({'success': True, 'message': 'Informations générales mises à jour'})
+
+@app.route('/api/general/header-image', methods=['POST'])
+@requires_auth
+def upload_header_image():
+    """Upload a header image for the property"""
+    property_id = get_verified_property_id()
+    if not property_id:
+        return jsonify({'error': 'Accès non autorisé à cette propriété'}), 403
+
+    if 'image' not in request.files:
+        return jsonify({'error': 'Aucune image fournie'}), 400
+
+    file = request.files['image']
+    if file.filename == '':
+        return jsonify({'error': 'Aucun fichier sélectionné'}), 400
+
+    # Validate file type
+    allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+    ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+    if ext not in allowed_extensions:
+        return jsonify({'error': 'Type de fichier non autorisé. Utilisez PNG, JPG, GIF ou WebP'}), 400
+
+    # Create uploads directory if it doesn't exist
+    upload_dir = os.path.join(app.static_folder, 'uploads', 'headers')
+    os.makedirs(upload_dir, exist_ok=True)
+
+    # Generate unique filename
+    filename = f"header_{property_id}_{int(datetime.now().timestamp())}.{ext}"
+    filepath = os.path.join(upload_dir, filename)
+
+    # Delete old header image if exists
+    general_info = db.get_general_info(property_id)
+    if general_info and general_info.get('header_image'):
+        old_filepath = os.path.join(upload_dir, general_info['header_image'])
+        if os.path.exists(old_filepath):
+            os.remove(old_filepath)
+
+    # Save the new file
+    file.save(filepath)
+
+    # Update database
+    db.update_header_image(property_id, filename)
+
+    return jsonify({
+        'success': True,
+        'message': 'Image d\'en-tête mise à jour',
+        'filename': filename,
+        'url': f'/static/uploads/headers/{filename}'
+    })
+
+@app.route('/api/general/header-image', methods=['DELETE'])
+@requires_auth
+def delete_header_image():
+    """Delete the header image for the property"""
+    property_id = get_verified_property_id()
+    if not property_id:
+        return jsonify({'error': 'Accès non autorisé à cette propriété'}), 403
+
+    # Get current header image
+    general_info = db.get_general_info(property_id)
+    if general_info and general_info.get('header_image'):
+        # Delete the file
+        upload_dir = os.path.join(app.static_folder, 'uploads', 'headers')
+        filepath = os.path.join(upload_dir, general_info['header_image'])
+        if os.path.exists(filepath):
+            os.remove(filepath)
+
+    # Update database
+    db.delete_header_image(property_id)
+
+    return jsonify({'success': True, 'message': 'Image d\'en-tête supprimée'})
 
 # API Routes - WiFi
 @app.route('/api/wifi', methods=['GET'])
@@ -1041,6 +1118,89 @@ def get_emergency():
     if not property_id:
         return jsonify([])
     data = db.get_all_emergency_numbers(property_id)
+    return jsonify(data)
+
+# API Routes - Amenities (Équipements)
+@app.route('/api/amenities', methods=['GET'])
+def get_amenities():
+    property_id = get_verified_property_id()
+    if not property_id:
+        return jsonify([])
+    # Initialize amenities if not yet done
+    db.initialize_amenities_for_property(property_id)
+    data = db.get_all_amenities(property_id)
+    return jsonify(data)
+
+@app.route('/api/amenities/available', methods=['GET'])
+def get_available_amenities():
+    """Get only available amenities (for guest display)"""
+    property_id = get_verified_property_id()
+    if not property_id:
+        return jsonify([])
+    data = db.get_available_amenities(property_id)
+    return jsonify(data)
+
+@app.route('/api/amenities/<int:amenity_id>', methods=['GET'])
+def get_amenity(amenity_id):
+    data = db.get_amenity(amenity_id)
+    if data:
+        return jsonify(data)
+    return jsonify({'error': 'Amenity not found'}), 404
+
+@app.route('/api/amenities/<int:amenity_id>/toggle', methods=['POST'])
+@requires_auth
+def toggle_amenity(amenity_id):
+    """Toggle the availability of an amenity"""
+    data = request.json
+    is_available = data.get('is_available', False)
+    db.toggle_amenity(amenity_id, is_available)
+    return jsonify({'success': True, 'message': 'Équipement mis à jour'})
+
+@app.route('/api/amenities/bulk-update', methods=['POST'])
+@requires_auth
+def bulk_update_amenities():
+    """Update multiple amenities at once"""
+    property_id = get_verified_property_id()
+    if not property_id:
+        return jsonify({'error': 'Accès non autorisé à cette propriété'}), 403
+
+    data = request.json
+    amenities_status = data.get('amenities', {})  # {amenity_id: is_available}
+
+    for amenity_id, is_available in amenities_status.items():
+        db.toggle_amenity(int(amenity_id), is_available)
+
+    return jsonify({'success': True, 'message': 'Équipements enregistrés avec succès'})
+
+@app.route('/api/amenities', methods=['POST'])
+@requires_auth
+def create_amenity():
+    property_id = get_verified_property_id()
+    if not property_id:
+        return jsonify({'error': 'Accès non autorisé à cette propriété'}), 403
+    data = request.json
+    amenity_id = db.create_amenity(property_id, data)
+    return jsonify({'success': True, 'id': amenity_id, 'message': 'Équipement créé'})
+
+@app.route('/api/amenities/<int:amenity_id>', methods=['PUT'])
+@requires_auth
+def update_amenity(amenity_id):
+    data = request.json
+    db.update_amenity(amenity_id, data)
+    return jsonify({'success': True, 'message': 'Équipement mis à jour'})
+
+@app.route('/api/amenities/<int:amenity_id>', methods=['DELETE'])
+@requires_auth
+def delete_amenity(amenity_id):
+    db.delete_amenity(amenity_id)
+    return jsonify({'success': True, 'message': 'Équipement supprimé'})
+
+@app.route('/api/amenity-categories', methods=['GET'])
+def get_amenity_categories():
+    property_id = get_verified_property_id()
+    if not property_id:
+        return jsonify([])
+    data = db.get_amenity_categories(property_id)
     return jsonify(data)
 
 # Export endpoint

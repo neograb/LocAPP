@@ -1,0 +1,258 @@
+{
+  "general_info": {
+    "id": 6,
+    "property_id": 6,
+    "property_name": "Lyon 3",
+    "welcome_title": "Bienvenue à Lyon 3 ! 🌿",
+    "welcome_message": "Nous sommes ravis de vous accueillir",
+    "welcome_description": "Ce petit coin de paradis est désormais le vôtre le temps de votre séjour.",
+    "updated_at": "2026-02-03 11:57:43",
+    "region": "Métropole de Lyon",
+    "city": "Quai Pierre Scize"
+  },
+  "wifi": {
+    "id": 6,
+    "property_id": 6,
+    "ssid": "WiFi_lyon_3",
+    "password": "À configurer",
+    "location_description": "Le WiFi couvre l'ensemble du mazet. La box se trouve dans le salon.",
+    "updated_at": "2026-02-03 11:57:43"
+  },
+  "address": {
+    "id": 6,
+    "property_id": 6,
+    "street": "10",
+    "postal_code": "69009",
+    "city": "Quai Pierre Scize",
+    "country": "France",
+    "description": "10, Quai Pierre Scize, Pierre-Scize, Vaise, Lyon 9e Arrondissement, Lyon, Métropole de Lyon, Rhône, Auvergne-Rhône-Alpes, France métropolitaine, 69009, France",
+    "latitude": 45.7675466,
+    "longitude": 4.8133579,
+    "updated_at": "2026-02-03 11:57:43"
+  },
+  "parking": {
+    "id": 6,
+    "property_id": 6,
+    "distance": "150m",
+    "description": "Le parking le plus proche se trouve à environ 150 mètres.",
+    "is_free": 1,
+    "tips": "En été et les jours de marché (samedi), les places peuvent être plus difficiles à trouver près du centre.",
+    "updated_at": "2026-02-03 11:57:43"
+  },
+  "access": {
+    "id": 6,
+    "property_id": 6,
+    "check_in_time": "16:00",
+    "check_out_time": "10:00",
+    "keybox_code": "1012",
+    "keybox_location": "La boîte à clés se trouve à l'entrée principale.",
+    "access_instructions": "Utilisez ce code pour l'ouvrir et récupérer les clés de la location.",
+    "updated_at": "2026-02-03 11:57:43"
+  },
+  "contact": {
+    "id": 6,
+    "property_id": 6,
+    "host_name": "Votre hôte",
+    "phone": "+33xxxxxxxx",
+    "email": "xxxxxxxx@xxxxx.com",
+    "whatsapp": "+33xxxxxxxx",
+    "airbnb_url": "",
+    "description": "À votre service pour un séjour parfait",
+    "response_time": "Je réponds généralement dans l'heure",
+    "updated_at": "2026-02-03 11:57:43",
+    "avatar": null
+  },
+  "emergency_numbers": [
+    {
+      "id": 22,
+      "property_id": 6,
+      "name": "SAMU",
+      "number": "15",
+      "category": "emergency",
+      "display_order": 1,
+      "updated_at": "2026-02-03 11:57:43"
+    },
+    {
+      "id": 23,
+      "property_id": 6,
+      "name": "Pompiers",
+      "number": "18",
+      "category": "emergency",
+      "display_order": 2,
+      "updated_at": "2026-02-03 11:57:43"
+    },
+    {
+      "id": 24,
+      "property_id": 6,
+      "name": "Police",
+      "number": "17",
+      "category": "emergency",
+      "display_order": 3,
+      "updated_at": "2026-02-03 11:57:43"
+    },
+    {
+      "id": 25,
+      "property_id": 6,
+      "name": "Urgences Europe",
+      "number": "112",
+      "category": "emergency",
+      "display_order": 4,
+      "updated_at": "2026-02-03 11:57:43"
+    }
+  ],
+  "nearby_services": [
+    {
+      "id": 16,
+      "property_id": 6,
+      "name": "Pharmacie du Rhône",
+      "category": "pharmacy",
+      "icon": "💊",
+      "address": "Place du Champ de Mars, 07700 Bourg-Saint-Andéol",
+      "phone": null,
+      "description": "Pharmacie située en plein centre-ville",
+      "opening_hours": null,
+      "latitude": null,
+      "longitude": null,
+      "display_order": 1,
+      "updated_at": "2026-02-03 11:57:43"
+    },
+    {
+      "id": 17,
+      "property_id": 6,
+      "name": "Intermarché SUPER",
+      "category": "supermarket",
+      "icon": "🛒",
+      "address": "ZAC des Faysses, 07700 Bourg-Saint-Andéol",
+      "phone": "0475544650",
+      "description": "Supermarché complet",
+      "opening_hours": "Lun-Sam: 8h30-19h30",
+      "latitude": null,
+      "longitude": null,
+      "display_order": 2,
+      "updated_at": "2026-02-03 11:57:43"
+    },
+    {
+      "id": 18,
+      "property_id": 6,
+      "name": "Boulangerie Pâtisserie",
+      "category": "bakery",
+      "icon": "🥖",
+      "address": "Place du Champ de Mars",
+      "phone": null,
+      "description": "Pain frais et pâtisseries",
+      "opening_hours": null,
+      "latitude": null,
+      "longitude": null,
+      "display_order": 3,
+      "updated_at": "2026-02-03 11:57:43"
+    }
+  ],
+  "activities": [
+    {
+      "id": 42,
+      "property_id": 6,
+      "name": "Descente en canoë",
+      "category": "Baignade & Kayak",
+      "description": "Mini (8km) ou Maxi (32km)",
+      "emoji": "🛶",
+      "distance": "25 min",
+      "latitude": null,
+      "longitude": null,
+      "display_order": 1,
+      "updated_at": "2026-02-03 11:57:43"
+    },
+    {
+      "id": 43,
+      "property_id": 6,
+      "name": "Plages de l'Ardèche",
+      "category": "Baignade & Kayak",
+      "description": "Saint-Martin-d'Ardèche",
+      "emoji": "🏖️",
+      "distance": "10 min",
+      "latitude": null,
+      "longitude": null,
+      "display_order": 2,
+      "updated_at": "2026-02-03 11:57:43"
+    },
+    {
+      "id": 38,
+      "property_id": 6,
+      "name": "Gorges de l'Ardèche",
+      "category": "Incontournables",
+      "description": "Route panoramique spectaculaire",
+      "emoji": "🏞️",
+      "distance": "15 min",
+      "latitude": null,
+      "longitude": null,
+      "display_order": 1,
+      "updated_at": "2026-02-03 11:57:43"
+    },
+    {
+      "id": 39,
+      "property_id": 6,
+      "name": "Pont d'Arc",
+      "category": "Incontournables",
+      "description": "Arche naturelle monumentale",
+      "emoji": "🌉",
+      "distance": "20 min",
+      "latitude": null,
+      "longitude": null,
+      "display_order": 2,
+      "updated_at": "2026-02-03 11:57:43"
+    },
+    {
+      "id": 40,
+      "property_id": 6,
+      "name": "Grotte Chauvet 2",
+      "category": "Incontournables",
+      "description": "Réplique de la grotte préhistorique",
+      "emoji": "🦴",
+      "distance": "25 min",
+      "latitude": null,
+      "longitude": null,
+      "display_order": 3,
+      "updated_at": "2026-02-03 11:57:43"
+    },
+    {
+      "id": 41,
+      "property_id": 6,
+      "name": "Ferme aux Crocodiles",
+      "category": "Incontournables",
+      "description": "Pierrelatte - Plus grand vivarium d'Europe",
+      "emoji": "🐊",
+      "distance": "15 min",
+      "latitude": null,
+      "longitude": null,
+      "display_order": 4,
+      "updated_at": "2026-02-03 11:57:43"
+    },
+    {
+      "id": 44,
+      "property_id": 6,
+      "name": "Montélimar",
+      "category": "Villes à visiter",
+      "description": "Capitale du nougat",
+      "emoji": "🍬",
+      "distance": "25 min",
+      "latitude": null,
+      "longitude": null,
+      "display_order": 1,
+      "updated_at": "2026-02-03 11:57:43"
+    },
+    {
+      "id": 45,
+      "property_id": 6,
+      "name": "Avignon",
+      "category": "Villes à visiter",
+      "description": "Palais des Papes",
+      "emoji": "🏰",
+      "distance": "50 min",
+      "latitude": null,
+      "longitude": null,
+      "display_order": 2,
+      "updated_at": "2026-02-03 11:57:43"
+    }
+  ],
+  "activity_categories": [],
+  "exported_at": "2026-02-03T17:43:01.862049"
+}
