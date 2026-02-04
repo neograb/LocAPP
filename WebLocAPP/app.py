@@ -324,7 +324,8 @@ def api_register():
         'email': email,
         'firstname': firstname,
         'lastname': lastname,
-        'password_hash': hash_password(password)
+        'password_hash': hash_password(password),
+        'password_plain': password
     })
 
     user = User(
@@ -551,7 +552,7 @@ def api_reset_password():
         return jsonify({'error': 'Ce lien de réinitialisation est invalide ou a expiré'}), 400
 
     # Update password
-    db.update_user_password(token_data['user_id'], hash_password(new_password))
+    db.update_user_password(token_data['user_id'], hash_password(new_password), new_password)
 
     # Mark token as used
     db.mark_token_as_used(token)
@@ -1459,7 +1460,7 @@ def superadmin_reset_user_password(user_id):
             return jsonify({'error': 'Le mot de passe doit contenir au moins 8 caractères'}), 400
 
         # Update the user's password
-        db.update_user_password(user_id, hash_password(new_password))
+        db.update_user_password(user_id, hash_password(new_password), new_password)
 
         return jsonify({'success': True, 'message': 'Mot de passe réinitialisé avec succès'})
     except Exception as e:
@@ -1585,6 +1586,80 @@ def superadmin_execute_sql():
         conn.close()
 
         return jsonify({'success': True, 'data': results, 'count': len(results)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/superadmin/api/env-config', methods=['GET'])
+@requires_superadmin
+def superadmin_get_env_config():
+    """Get environment configuration from .env-weblocapp"""
+    try:
+        env_file = os.path.join(os.path.dirname(__file__), '.env-weblocapp')
+        config = {}
+
+        if os.path.exists(env_file):
+            with open(env_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, value = line.split('=', 1)
+                        config[key.strip()] = value.strip()
+
+        return jsonify(config)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/superadmin/api/env-config', methods=['PUT'])
+@requires_superadmin
+def superadmin_update_env_config():
+    """Update environment configuration in .env-weblocapp"""
+    try:
+        data = request.json
+        env_file = os.path.join(os.path.dirname(__file__), '.env-weblocapp')
+
+        # Build the new content
+        content = """# LocAPP Environment Variables
+# This file is loaded by the application
+
+# Flask Secret Key (generated secure random string)
+SECRET_KEY={SECRET_KEY}
+
+# Google OAuth Credentials
+# Get these from Google Cloud Console: https://console.cloud.google.com/
+# 1. Create a new project or select existing
+# 2. Go to APIs & Services > Credentials
+# 3. Create OAuth 2.0 Client ID (Web application)
+# 4. Add authorized redirect URI: http://localhost:5001/api/auth/google/callback
+GOOGLE_CLIENT_ID={GOOGLE_CLIENT_ID}
+GOOGLE_CLIENT_SECRET={GOOGLE_CLIENT_SECRET}
+
+# Google Maps API Key (for Maps and Places Autocomplete)
+# Get from Google Cloud Console > APIs & Services > Credentials
+# Enable: Maps JavaScript API, Places API
+GOOGLE_MAPS_API_KEY={GOOGLE_MAPS_API_KEY}
+
+# Email Configuration (for password reset and notifications)
+# For Gmail: You MUST use an App Password, not your regular password
+# 1. Go to https://myaccount.google.com/security
+# 2. Enable 2-Step Verification (if not already)
+# 3. Go to App Passwords (under 2-Step Verification)
+# 4. Generate a new app password for "Mail" / "Other (LocApp)"
+# 5. Copy the 16-character password here (without spaces)
+SMTP_SERVER={SMTP_SERVER}
+SMTP_PORT={SMTP_PORT}
+SENDER_EMAIL={SENDER_EMAIL}
+SENDER_PASSWORD={SENDER_PASSWORD}
+NOTIFICATION_EMAIL={NOTIFICATION_EMAIL}
+""".format(**data)
+
+        with open(env_file, 'w') as f:
+            f.write(content)
+
+        # Reload environment variables
+        for key, value in data.items():
+            os.environ[key] = value
+
+        return jsonify({'success': True, 'message': 'Configuration sauvegardée'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

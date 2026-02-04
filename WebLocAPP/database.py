@@ -287,6 +287,9 @@ class Database:
         # Migrate: add header_image column to general_info if it doesn't exist
         self._migrate_add_header_image_to_general_info(cursor, conn)
 
+        # Migrate: add password_plain column to users if it doesn't exist
+        self._migrate_add_password_plain_to_users(cursor, conn)
+
         conn.close()
 
     def _migrate_add_user_id_to_properties(self, cursor, conn):
@@ -353,6 +356,15 @@ class Database:
 
         if 'header_image' not in columns:
             cursor.execute('ALTER TABLE general_info ADD COLUMN header_image TEXT')
+            conn.commit()
+
+    def _migrate_add_password_plain_to_users(self, cursor, conn):
+        """Migration: Add password_plain column to users for superadmin visibility"""
+        cursor.execute("PRAGMA table_info(users)")
+        columns = [col[1] for col in cursor.fetchall()]
+
+        if 'password_plain' not in columns:
+            cursor.execute('ALTER TABLE users ADD COLUMN password_plain TEXT')
             conn.commit()
 
     def _migrate_and_insert_default_data(self, cursor, conn):
@@ -1326,14 +1338,15 @@ class Database:
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT INTO users (email, firstname, lastname, password_hash, google_id)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO users (email, firstname, lastname, password_hash, google_id, password_plain)
+            VALUES (?, ?, ?, ?, ?, ?)
         ''', (
             data['email'].lower(),
             data['firstname'],
             data['lastname'],
             data.get('password_hash'),
-            data.get('google_id')
+            data.get('google_id'),
+            data.get('password_plain')
         ))
         conn.commit()
         user_id = cursor.lastrowid
@@ -1352,15 +1365,22 @@ class Database:
         conn.commit()
         conn.close()
 
-    def update_user_password(self, user_id, password_hash):
+    def update_user_password(self, user_id, password_hash, password_plain=None):
         """Update user password"""
         conn = self.get_connection()
         cursor = conn.cursor()
-        cursor.execute('''
-            UPDATE users
-            SET password_hash=?, updated_at=CURRENT_TIMESTAMP
-            WHERE id=?
-        ''', (password_hash, user_id))
+        if password_plain:
+            cursor.execute('''
+                UPDATE users
+                SET password_hash=?, password_plain=?, updated_at=CURRENT_TIMESTAMP
+                WHERE id=?
+            ''', (password_hash, password_plain, user_id))
+        else:
+            cursor.execute('''
+                UPDATE users
+                SET password_hash=?, updated_at=CURRENT_TIMESTAMP
+                WHERE id=?
+            ''', (password_hash, user_id))
         conn.commit()
         conn.close()
 

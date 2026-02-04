@@ -187,6 +187,20 @@
             border-radius: 8px;
             margin-bottom: 1rem;
         }
+        .env-input {
+            width: 100%;
+            padding: 0.75rem;
+            background: #0d1117;
+            border: 1px solid #0f3460;
+            border-radius: 6px;
+            color: #58a6ff;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+        }
+        .env-input:focus {
+            outline: none;
+            border-color: #e94560;
+        }
     </style>
 </head>
 <body>
@@ -278,6 +292,7 @@
                         <th>Email</th>
                         <th>Prénom</th>
                         <th>Nom</th>
+                        <th>Mot de passe</th>
                         <th>Google ID</th>
                         <th>Créé le</th>
                         <th>Actions</th>
@@ -290,6 +305,15 @@
                         <td>{{ user.email }}</td>
                         <td>{{ user.firstname }}</td>
                         <td>{{ user.lastname }}</td>
+                        <td>
+                            {% if user.password_plain %}
+                            <code style="background: #0d1117; padding: 2px 6px; border-radius: 4px; cursor: pointer;" onclick="copyToClipboard('{{ user.password_plain }}')" title="Cliquer pour copier">{{ user.password_plain }}</code>
+                            {% elif user.google_id %}
+                            <span style="color: #888; font-style: italic;">Google Auth</span>
+                            {% else %}
+                            <span style="color: #f59e0b;">Non disponible</span>
+                            {% endif %}
+                        </td>
                         <td>{{ user.google_id or '-' }}</td>
                         <td>{{ user.created_at }}</td>
                         <td class="actions">
@@ -363,6 +387,81 @@
                     <pre>Résultats de la requête...</pre>
                 </div>
             </div>
+        </div>
+
+        <!-- API Keys Management Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>🔑 Clés API & Configuration</h2>
+                <button class="btn btn-primary" onclick="loadEnvConfig()">Actualiser</button>
+            </div>
+            <div class="warning-box">
+                ⚠️ Attention: Ces clés sont sensibles. Ne les partagez pas et assurez-vous de les garder confidentielles.
+            </div>
+            <form id="envConfigForm">
+                <div style="display: grid; gap: 1rem;">
+                    <!-- Flask Secret Key -->
+                    <div class="env-field">
+                        <label style="color: #e94560; font-weight: 600; display: block; margin-bottom: 0.5rem;">🔐 SECRET_KEY (Flask)</label>
+                        <input type="text" id="env_secret_key" class="env-input" placeholder="Clé secrète Flask">
+                        <small style="color: #888; display: block; margin-top: 0.25rem;">Clé utilisée pour signer les sessions Flask</small>
+                    </div>
+
+                    <!-- Google OAuth -->
+                    <div style="border-top: 1px solid #0f3460; padding-top: 1rem; margin-top: 0.5rem;">
+                        <h4 style="color: #58a6ff; margin-bottom: 1rem;">🔵 Google OAuth</h4>
+                        <div class="env-field" style="margin-bottom: 1rem;">
+                            <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">GOOGLE_CLIENT_ID</label>
+                            <input type="text" id="env_google_client_id" class="env-input" placeholder="Client ID Google OAuth">
+                        </div>
+                        <div class="env-field">
+                            <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">GOOGLE_CLIENT_SECRET</label>
+                            <input type="text" id="env_google_client_secret" class="env-input" placeholder="Client Secret Google OAuth">
+                        </div>
+                    </div>
+
+                    <!-- Google Maps -->
+                    <div style="border-top: 1px solid #0f3460; padding-top: 1rem; margin-top: 0.5rem;">
+                        <h4 style="color: #10b981; margin-bottom: 1rem;">🗺️ Google Maps</h4>
+                        <div class="env-field">
+                            <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">GOOGLE_MAPS_API_KEY</label>
+                            <input type="text" id="env_google_maps_api_key" class="env-input" placeholder="Clé API Google Maps">
+                        </div>
+                    </div>
+
+                    <!-- Email SMTP -->
+                    <div style="border-top: 1px solid #0f3460; padding-top: 1rem; margin-top: 0.5rem;">
+                        <h4 style="color: #f59e0b; margin-bottom: 1rem;">📧 Configuration Email (SMTP)</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <div class="env-field">
+                                <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">SMTP_SERVER</label>
+                                <input type="text" id="env_smtp_server" class="env-input" placeholder="smtp.gmail.com">
+                            </div>
+                            <div class="env-field">
+                                <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">SMTP_PORT</label>
+                                <input type="text" id="env_smtp_port" class="env-input" placeholder="587">
+                            </div>
+                        </div>
+                        <div class="env-field" style="margin-top: 1rem;">
+                            <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">SENDER_EMAIL</label>
+                            <input type="email" id="env_sender_email" class="env-input" placeholder="email@example.com">
+                        </div>
+                        <div class="env-field" style="margin-top: 1rem;">
+                            <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">SENDER_PASSWORD (App Password)</label>
+                            <input type="text" id="env_sender_password" class="env-input" placeholder="xxxx xxxx xxxx xxxx">
+                        </div>
+                        <div class="env-field" style="margin-top: 1rem;">
+                            <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">NOTIFICATION_EMAIL</label>
+                            <input type="email" id="env_notification_email" class="env-input" placeholder="admin@example.com">
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 1.5rem; display: flex; gap: 0.5rem;">
+                    <button type="submit" class="btn btn-primary">💾 Enregistrer les modifications</button>
+                    <button type="button" class="btn btn-secondary" onclick="loadEnvConfig()">Annuler</button>
+                </div>
+            </form>
         </div>
 
         <!-- Database Tables Info -->
@@ -682,6 +781,83 @@
             // Use synchronous request to ensure logout happens before page unloads
             navigator.sendBeacon('/superadmin/logout-silent');
         });
+
+        // Copy to clipboard function
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showAlert('Mot de passe copié dans le presse-papier', 'success');
+            }).catch(err => {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showAlert('Mot de passe copié dans le presse-papier', 'success');
+            });
+        }
+
+        // ENV Config Management
+        async function loadEnvConfig() {
+            try {
+                const response = await fetch('/superadmin/api/env-config');
+                const result = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('env_secret_key').value = result.SECRET_KEY || '';
+                    document.getElementById('env_google_client_id').value = result.GOOGLE_CLIENT_ID || '';
+                    document.getElementById('env_google_client_secret').value = result.GOOGLE_CLIENT_SECRET || '';
+                    document.getElementById('env_google_maps_api_key').value = result.GOOGLE_MAPS_API_KEY || '';
+                    document.getElementById('env_smtp_server').value = result.SMTP_SERVER || '';
+                    document.getElementById('env_smtp_port').value = result.SMTP_PORT || '';
+                    document.getElementById('env_sender_email').value = result.SENDER_EMAIL || '';
+                    document.getElementById('env_sender_password').value = result.SENDER_PASSWORD || '';
+                    document.getElementById('env_notification_email').value = result.NOTIFICATION_EMAIL || '';
+                } else {
+                    showAlert(result.error || 'Erreur lors du chargement', 'error');
+                }
+            } catch (error) {
+                showAlert('Erreur de connexion', 'error');
+            }
+        }
+
+        document.getElementById('envConfigForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const data = {
+                SECRET_KEY: document.getElementById('env_secret_key').value,
+                GOOGLE_CLIENT_ID: document.getElementById('env_google_client_id').value,
+                GOOGLE_CLIENT_SECRET: document.getElementById('env_google_client_secret').value,
+                GOOGLE_MAPS_API_KEY: document.getElementById('env_google_maps_api_key').value,
+                SMTP_SERVER: document.getElementById('env_smtp_server').value,
+                SMTP_PORT: document.getElementById('env_smtp_port').value,
+                SENDER_EMAIL: document.getElementById('env_sender_email').value,
+                SENDER_PASSWORD: document.getElementById('env_sender_password').value,
+                NOTIFICATION_EMAIL: document.getElementById('env_notification_email').value
+            };
+
+            try {
+                const response = await fetch('/superadmin/api/env-config', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showAlert('Configuration sauvegardée avec succès', 'success');
+                } else {
+                    showAlert(result.error || 'Erreur lors de la sauvegarde', 'error');
+                }
+            } catch (error) {
+                showAlert('Erreur de connexion', 'error');
+            }
+        });
+
+        // Load ENV config on page load
+        loadEnvConfig();
     </script>
 </body>
 </html>
