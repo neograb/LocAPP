@@ -44,8 +44,9 @@ Thumbs.db
 # Backups
 backups/
 
-# User uploads
-static/uploads/
+# User uploads - photos not versioned
+static/uploads/photos/
+static/uploads/headers/
 
 # Data exports
 locapp_vaujany.json
