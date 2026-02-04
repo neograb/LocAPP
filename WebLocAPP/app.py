@@ -1442,26 +1442,6 @@ def get_access_photos_limit():
     })
 
 # ============================================
-# App Config API (SuperAdmin)
-# ============================================
-
-@app.route('/superadmin/api/app-config', methods=['GET'])
-@requires_superadmin
-def superadmin_get_app_config():
-    """Get all app configuration"""
-    config = db.get_all_app_config()
-    return jsonify(config)
-
-@app.route('/superadmin/api/app-config', methods=['PUT'])
-@requires_superadmin
-def superadmin_update_app_config():
-    """Update app configuration"""
-    data = request.json
-    for key, value in data.items():
-        db.set_app_config(key, str(value))
-    return jsonify({'success': True, 'message': 'Configuration mise à jour'})
-
-# ============================================
 # SuperAdmin Routes (Secure Database Admin)
 # ============================================
 
@@ -1795,6 +1775,22 @@ NOTIFICATION_EMAIL={NOTIFICATION_EMAIL}
         return jsonify({'success': True, 'message': 'Configuration sauvegardée'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/superadmin/api/app-config', methods=['GET'])
+@requires_superadmin
+def superadmin_get_app_config():
+    """Get all app configuration"""
+    config = db.get_all_app_config()
+    return jsonify(config)
+
+@app.route('/superadmin/api/app-config', methods=['PUT'])
+@requires_superadmin
+def superadmin_update_app_config():
+    """Update app configuration"""
+    data = request.json
+    for key, value in data.items():
+        db.set_app_config(key, str(value))
+    return jsonify({'success': True, 'message': 'Configuration mise à jour'})
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)
