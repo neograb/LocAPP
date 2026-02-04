@@ -389,6 +389,34 @@
             </div>
         </div>
 
+        <!-- Photo Limits Configuration -->
+        <div class="section">
+            <div class="section-header">
+                <h2>📷 Limites de Photos</h2>
+                <button class="btn btn-primary" onclick="loadPhotoLimits()">Actualiser</button>
+            </div>
+            <p style="color: #888; margin-bottom: 1rem;">
+                Configurez le nombre maximum de photos autorisées pour chaque section de l'application.
+            </p>
+            <form id="photoLimitsForm">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="env-field">
+                        <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">📸 Galerie Photos (page Photos)</label>
+                        <input type="number" id="config_max_photos_gallery" class="env-input" min="1" max="100" placeholder="50">
+                        <small style="color: #888; display: block; margin-top: 0.25rem;">Nombre max de photos dans la galerie principale</small>
+                    </div>
+                    <div class="env-field">
+                        <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">🔐 Photos d'Accès (page Accès)</label>
+                        <input type="number" id="config_max_photos_access" class="env-input" min="1" max="20" placeholder="3">
+                        <small style="color: #888; display: block; margin-top: 0.25rem;">Nombre max de photos pour l'aide à l'accès</small>
+                    </div>
+                </div>
+                <div style="margin-top: 1rem;">
+                    <button type="submit" class="btn btn-primary">💾 Enregistrer les limites</button>
+                </div>
+            </form>
+        </div>
+
         <!-- API Keys Management Section -->
         <div class="section">
             <div class="section-header">
@@ -858,6 +886,56 @@
 
         // Load ENV config on page load
         loadEnvConfig();
+
+        // ============================================
+        // Photo Limits Management
+        // ============================================
+
+        async function loadPhotoLimits() {
+            try {
+                const response = await fetch('/superadmin/api/app-config');
+                const result = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('config_max_photos_gallery').value = result.max_photos_gallery?.value || '50';
+                    document.getElementById('config_max_photos_access').value = result.max_photos_access?.value || '3';
+                } else {
+                    showAlert(result.error || 'Erreur lors du chargement', 'error');
+                }
+            } catch (error) {
+                showAlert('Erreur de connexion', 'error');
+            }
+        }
+
+        document.getElementById('photoLimitsForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const data = {
+                max_photos_gallery: document.getElementById('config_max_photos_gallery').value,
+                max_photos_access: document.getElementById('config_max_photos_access').value
+            };
+
+            try {
+                const response = await fetch('/superadmin/api/app-config', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showAlert('Limites de photos mises à jour', 'success');
+                } else {
+                    showAlert(result.error || 'Erreur lors de la sauvegarde', 'error');
+                }
+            } catch (error) {
+                showAlert('Erreur de connexion', 'error');
+            }
+        });
+
+        // Load photo limits on page load
+        loadPhotoLimits();
     </script>
 </body>
 </html>

@@ -1329,6 +1329,139 @@ def delete_photo(photo_id):
     return jsonify({'success': True, 'message': 'Photo supprimée'})
 
 # ============================================
+# Access Photos API
+# ============================================
+
+@app.route('/api/access-photos', methods=['GET'])
+def get_access_photos():
+    property_id = get_verified_property_id()
+    if not property_id:
+        return jsonify([])
+    data = db.get_all_access_photos(property_id)
+    return jsonify(data)
+
+@app.route('/api/access-photos', methods=['POST'])
+@requires_auth
+def upload_access_photo():
+    property_id = get_verified_property_id()
+    if not property_id:
+        return jsonify({'error': 'Accès non autorisé à cette propriété'}), 403
+
+    # Check photo limit
+    max_photos = int(db.get_app_config('max_photos_access') or 3)
+    current_count = db.count_access_photos(property_id)
+    if current_count >= max_photos:
+        return jsonify({'error': f'Limite atteinte: maximum {max_photos} photos autorisées'}), 400
+
+    if 'photo' not in request.files:
+        return jsonify({'error': 'Aucun fichier fourni'}), 400
+
+    file = request.files['photo']
+    if file.filename == '':
+        return jsonify({'error': 'Aucun fichier sélectionné'}), 400
+
+    if not allowed_file(file.filename):
+        return jsonify({'error': 'Type de fichier non autorisé. Utilisez: png, jpg, jpeg, gif, webp'}), 400
+
+    # Generate unique filename
+    original_name = secure_filename(file.filename)
+    ext = original_name.rsplit('.', 1)[1].lower() if '.' in original_name else 'jpg'
+    unique_filename = f"access_{property_id}_{uuid.uuid4().hex}.{ext}"
+
+    # Create access photos subfolder
+    access_folder = os.path.join(app.config['UPLOAD_FOLDER'], 'access', str(property_id))
+    os.makedirs(access_folder, exist_ok=True)
+
+    # Save file
+    filepath = os.path.join(access_folder, unique_filename)
+    file.save(filepath)
+
+    # Get optional metadata
+    title = request.form.get('title', '')
+    description = request.form.get('description', '')
+
+    # Save to database
+    photo_id = db.create_access_photo({
+        'filename': f"access/{property_id}/{unique_filename}",
+        'original_name': original_name,
+        'title': title,
+        'description': description
+    }, property_id)
+
+    return jsonify({
+        'success': True,
+        'id': photo_id,
+        'filename': f"access/{property_id}/{unique_filename}",
+        'message': 'Photo uploadée avec succès'
+    })
+
+@app.route('/api/access-photos/<int:photo_id>', methods=['PUT'])
+@requires_auth
+def update_access_photo(photo_id):
+    photo = db.get_access_photo(photo_id)
+    if not photo:
+        return jsonify({'error': 'Photo non trouvée'}), 404
+
+    property_id = get_verified_property_id()
+    if not property_id or photo['property_id'] != property_id:
+        return jsonify({'error': 'Accès non autorisé'}), 403
+
+    data = request.json
+    db.update_access_photo(photo_id, data)
+    return jsonify({'success': True, 'message': 'Photo mise à jour'})
+
+@app.route('/api/access-photos/<int:photo_id>', methods=['DELETE'])
+@requires_auth
+def delete_access_photo(photo_id):
+    photo = db.get_access_photo(photo_id)
+    if not photo:
+        return jsonify({'error': 'Photo non trouvée'}), 404
+
+    property_id = get_verified_property_id()
+    if not property_id or photo['property_id'] != property_id:
+        return jsonify({'error': 'Accès non autorisé'}), 403
+
+    # Delete file from disk
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], photo['filename'])
+    if os.path.exists(filepath):
+        os.remove(filepath)
+
+    db.delete_access_photo(photo_id)
+    return jsonify({'success': True, 'message': 'Photo supprimée'})
+
+@app.route('/api/access-photos/limit', methods=['GET'])
+def get_access_photos_limit():
+    """Get the current photo limit and count for access page"""
+    property_id = get_verified_property_id()
+    max_photos = int(db.get_app_config('max_photos_access') or 3)
+    current_count = db.count_access_photos(property_id) if property_id else 0
+    return jsonify({
+        'max': max_photos,
+        'current': current_count,
+        'remaining': max_photos - current_count
+    })
+
+# ============================================
+# App Config API (SuperAdmin)
+# ============================================
+
+@app.route('/superadmin/api/app-config', methods=['GET'])
+@requires_superadmin
+def superadmin_get_app_config():
+    """Get all app configuration"""
+    config = db.get_all_app_config()
+    return jsonify(config)
+
+@app.route('/superadmin/api/app-config', methods=['PUT'])
+@requires_superadmin
+def superadmin_update_app_config():
+    """Update app configuration"""
+    data = request.json
+    for key, value in data.items():
+        db.set_app_config(key, str(value))
+    return jsonify({'success': True, 'message': 'Configuration mise à jour'})
+
+# ============================================
 # SuperAdmin Routes (Secure Database Admin)
 # ============================================
 

@@ -267,6 +267,32 @@ class Database:
             )
         ''')
 
+        # Table pour les photos d'accès
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS access_photos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                property_id INTEGER NOT NULL,
+                filename TEXT NOT NULL,
+                original_name TEXT NOT NULL,
+                title TEXT,
+                description TEXT,
+                display_order INTEGER DEFAULT 0,
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (property_id) REFERENCES properties(id)
+            )
+        ''')
+
+        # Table pour la configuration de l'application
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS app_config (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                config_key TEXT NOT NULL UNIQUE,
+                config_value TEXT NOT NULL,
+                description TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
         conn.commit()
 
         # Migrer les données existantes et insérer les valeurs par défaut
@@ -289,6 +315,9 @@ class Database:
 
         # Migrate: add password_plain column to users if it doesn't exist
         self._migrate_add_password_plain_to_users(cursor, conn)
+
+        # Migrate: insert default app config values
+        self._migrate_insert_default_app_config(cursor, conn)
 
         conn.close()
 
@@ -366,6 +395,23 @@ class Database:
         if 'password_plain' not in columns:
             cursor.execute('ALTER TABLE users ADD COLUMN password_plain TEXT')
             conn.commit()
+
+    def _migrate_insert_default_app_config(self, cursor, conn):
+        """Migration: Insert default app configuration values"""
+        default_configs = [
+            ('max_photos_gallery', '50', 'Nombre maximum de photos dans la galerie'),
+            ('max_photos_access', '3', 'Nombre maximum de photos pour la page accès')
+        ]
+
+        for key, value, description in default_configs:
+            cursor.execute('SELECT id FROM app_config WHERE config_key = ?', (key,))
+            if not cursor.fetchone():
+                cursor.execute('''
+                    INSERT INTO app_config (config_key, config_value, description)
+                    VALUES (?, ?, ?)
+                ''', (key, value, description))
+
+        conn.commit()
 
     def _migrate_and_insert_default_data(self, cursor, conn):
         """Migrate existing data and insert default data"""
@@ -1483,6 +1529,117 @@ class Database:
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute('DELETE FROM photos WHERE id=?', (photo_id,))
+        conn.commit()
+        conn.close()
+
+    # ==================== Access Photos ====================
+
+    def get_all_access_photos(self, property_id):
+        """Get all access photos for a property"""
+        conn = self.get_connection()
+        results = conn.execute(
+            'SELECT * FROM access_photos WHERE property_id=? ORDER BY display_order, uploaded_at DESC',
+            (property_id,)
+        ).fetchall()
+        conn.close()
+        return [dict(row) for row in results]
+
+    def get_access_photo(self, photo_id):
+        """Get a single access photo by ID"""
+        conn = self.get_connection()
+        result = conn.execute('SELECT * FROM access_photos WHERE id=?', (photo_id,)).fetchone()
+        conn.close()
+        return dict(result) if result else None
+
+    def create_access_photo(self, data, property_id):
+        """Create a new access photo entry"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO access_photos (property_id, filename, original_name, title, description, display_order)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (
+            property_id,
+            data['filename'],
+            data['original_name'],
+            data.get('title', ''),
+            data.get('description', ''),
+            data.get('display_order', 0)
+        ))
+        conn.commit()
+        photo_id = cursor.lastrowid
+        conn.close()
+        return photo_id
+
+    def count_access_photos(self, property_id):
+        """Count access photos for a property"""
+        conn = self.get_connection()
+        result = conn.execute('SELECT COUNT(*) FROM access_photos WHERE property_id=?', (property_id,)).fetchone()
+        conn.close()
+        return result[0] if result else 0
+
+    def update_access_photo(self, photo_id, data):
+        """Update an access photo's metadata"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE access_photos
+            SET title=?, description=?, display_order=?
+            WHERE id=?
+        ''', (
+            data.get('title', ''),
+            data.get('description', ''),
+            data.get('display_order', 0),
+            photo_id
+        ))
+        conn.commit()
+        conn.close()
+
+    def delete_access_photo(self, photo_id):
+        """Delete an access photo entry"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM access_photos WHERE id=?', (photo_id,))
+        conn.commit()
+        conn.close()
+
+    # ==================== App Config ====================
+
+    def get_app_config(self, key):
+        """Get a config value by key"""
+        conn = self.get_connection()
+        result = conn.execute('SELECT config_value FROM app_config WHERE config_key=?', (key,)).fetchone()
+        conn.close()
+        return result[0] if result else None
+
+    def get_all_app_config(self):
+        """Get all app config values"""
+        conn = self.get_connection()
+        results = conn.execute('SELECT config_key, config_value, description FROM app_config').fetchall()
+        conn.close()
+        return {row[0]: {'value': row[1], 'description': row[2]} for row in results}
+
+    def set_app_config(self, key, value, description=None):
+        """Set a config value"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT id FROM app_config WHERE config_key=?', (key,))
+        if cursor.fetchone():
+            if description:
+                cursor.execute('''
+                    UPDATE app_config SET config_value=?, description=?, updated_at=CURRENT_TIMESTAMP
+                    WHERE config_key=?
+                ''', (value, description, key))
+            else:
+                cursor.execute('''
+                    UPDATE app_config SET config_value=?, updated_at=CURRENT_TIMESTAMP
+                    WHERE config_key=?
+                ''', (value, key))
+        else:
+            cursor.execute('''
+                INSERT INTO app_config (config_key, config_value, description)
+                VALUES (?, ?, ?)
+            ''', (key, value, description or ''))
         conn.commit()
         conn.close()
 
