@@ -3,15 +3,175 @@
 {% block title %}Activités - Administration LocApp{% endblock %}
 
 {% block content %}
+<style>
+    .section-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        margin-bottom: 1rem;
+        overflow: hidden;
+    }
+    .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.6rem 1rem;
+        background: var(--bg-secondary);
+        cursor: grab;
+        user-select: none;
+    }
+    .section-header:active {
+        cursor: grabbing;
+    }
+    .section-header.dragging {
+        opacity: 0.5;
+    }
+    .section-header-left {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .section-drag-handle {
+        color: var(--text-muted);
+        cursor: grab;
+    }
+    .section-icon {
+        font-size: 1.2rem;
+    }
+    .section-name {
+        font-weight: 600;
+        color: var(--primary-color);
+    }
+    .section-count {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-left: 0.5rem;
+    }
+    .section-actions {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+    .section-content {
+        padding: 0;
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease, padding 0.3s ease;
+    }
+    .section-content.expanded {
+        max-height: 2000px;
+        padding: 0.25rem 1rem 0.75rem 1rem;
+    }
+    .activity-item {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+        cursor: grab;
+    }
+    .activity-item:active {
+        cursor: grabbing;
+    }
+    .activity-item.dragging {
+        opacity: 0.5;
+    }
+    .activity-drag-handle {
+        color: var(--text-muted);
+        margin-right: 0.75rem;
+        cursor: grab;
+    }
+    .activity-emoji {
+        font-size: 1.25rem;
+        margin-right: 0.75rem;
+    }
+    .activity-info {
+        flex: 1;
+    }
+    .activity-name {
+        font-weight: 500;
+    }
+    .activity-desc {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+    }
+    .activity-distance {
+        font-size: 0.8rem;
+        color: var(--primary-color);
+        background: var(--accent-light);
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        margin-right: 0.5rem;
+    }
+    .activity-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    .btn-icon {
+        padding: 0.35rem 0.5rem;
+        font-size: 0.85rem;
+    }
+    .add-activity-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.75rem;
+        background: var(--bg-secondary);
+        border: 2px dashed var(--border-color);
+        border-radius: 8px;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .add-activity-btn:hover {
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+    }
+    .chevron {
+        transition: transform 0.3s;
+        cursor: pointer;
+    }
+    .chevron.expanded {
+        transform: rotate(180deg);
+    }
+    .drop-zone {
+        min-height: 50px;
+        border: 2px dashed transparent;
+        border-radius: 8px;
+        transition: all 0.2s;
+    }
+    .drop-zone.drag-over {
+        border-color: var(--primary-color);
+        background: rgba(var(--primary-rgb), 0.05);
+    }
+    .new-category-input {
+        display: none;
+        margin-top: 0.5rem;
+    }
+    .new-category-input.visible {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    .new-category-input > input:first-of-type {
+        flex: 1;
+        min-width: 150px;
+    }
+</style>
+
 <div class="admin-layout">
     <div class="admin-form-section">
         <div class="card">
             <div class="card-header">
                 <h2 class="card-title">Gestion des Activités</h2>
-                <button class="btn btn-primary" onclick="openAddModal()">Ajouter une activité</button>
+                <button class="btn btn-primary" onclick="openAddModal()">+ Ajouter</button>
             </div>
 
-            <div id="activitiesTable">
+            <div id="sectionsContainer">
                 <div class="spinner"></div>
             </div>
         </div>
@@ -28,55 +188,10 @@
                 <div class="app-content">
                     <div class="preview-content">
                         <div style="text-align: center; margin-bottom: 12px;">
-                            <strong style="font-size: 12px;">Découvrez l'Ardèche 🌿</strong>
-                            <p style="font-size: 8px; color: #6b7280;">Nos recommandations autour de BSA</p>
+                            <strong style="font-size: 12px;">Découvrez la région</strong>
+                            <p style="font-size: 8px; color: #6b7280;">Nos recommandations</p>
                         </div>
-
-                        <div id="preview-activities">
-                            <div class="preview-card">
-                                <div class="preview-card-header">
-                                    <span>⭐</span>
-                                    <strong>Incontournables</strong>
-                                </div>
-                                <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;">
-                                    <span style="font-size: 8px; background: #f3f4f6; padding: 2px 6px; border-radius: 8px;">Gorges de l'Ardèche</span>
-                                    <span style="font-size: 8px; background: #f3f4f6; padding: 2px 6px; border-radius: 8px;">Pont d'Arc</span>
-                                </div>
-                            </div>
-
-                            <div class="preview-card">
-                                <div class="preview-card-header">
-                                    <span>🏊</span>
-                                    <strong>Baignade & Kayak</strong>
-                                </div>
-                                <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;">
-                                    <span style="font-size: 8px; background: #f3f4f6; padding: 2px 6px; border-radius: 8px;">Canoë</span>
-                                    <span style="font-size: 8px; background: #f3f4f6; padding: 2px 6px; border-radius: 8px;">Plages</span>
-                                </div>
-                            </div>
-
-                            <div class="preview-card">
-                                <div class="preview-card-header">
-                                    <span>🏛️</span>
-                                    <strong>Villes à visiter</strong>
-                                </div>
-                                <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;">
-                                    <span style="font-size: 8px; background: #f3f4f6; padding: 2px 6px; border-radius: 8px;">Montélimar</span>
-                                    <span style="font-size: 8px; background: #f3f4f6; padding: 2px 6px; border-radius: 8px;">Avignon</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="preview-card" style="background: #fffbeb; margin-top: 12px;">
-                            <div class="preview-card-header">
-                                <span>🍯</span>
-                                <strong>Spécialités</strong>
-                            </div>
-                            <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;">
-                                <span style="font-size: 8px; background: #fef3c7; color: #b45309; padding: 2px 6px; border-radius: 8px;">🧀 Picodon</span>
-                                <span style="font-size: 8px; background: #fef3c7; color: #b45309; padding: 2px 6px; border-radius: 8px;">🍬 Nougat</span>
-                            </div>
-                        </div>
+                        <div id="preview-activities"></div>
                     </div>
                 </div>
             </div>
@@ -101,38 +216,75 @@
             </div>
 
             <div class="form-group">
-                <label class="form-label" for="category">Catégorie</label>
+                <label class="form-label" for="category">Section</label>
                 <select class="form-control" id="category" name="category" required>
-                    <option value="">Sélectionnez une catégorie</option>
+                    <option value="">Choisir ou créer une section...</option>
                 </select>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="description">Description</label>
-                <textarea class="form-control" id="description" name="description" rows="3" required></textarea>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="emoji">Emoji</label>
-                <div class="emoji-input-wrapper">
-                    <input type="text" class="form-control emoji-input" id="emoji" name="emoji" readonly placeholder="Cliquez pour choisir" required>
-                    <button type="button" class="emoji-trigger" onclick="openEmojiPicker('emoji', this)">🏞️</button>
+                <div class="new-category-input" id="newCategoryInput">
+                    <input type="text" class="form-control" id="newCategoryName" placeholder="Nom de la section">
+                    <div class="emoji-input-wrapper" style="flex-shrink: 0;">
+                        <input type="text" class="form-control emoji-input" id="newCategoryIcon" readonly style="width: 50px; text-align: center;">
+                        <button type="button" class="emoji-trigger" onclick="openEmojiPicker('newCategoryIcon', this)">📍</button>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-primary" onclick="createCategoryInline()">Créer</button>
                 </div>
             </div>
 
             <div class="form-group">
-                <label class="form-label" for="distance">Distance</label>
-                <input type="text" class="form-control" id="distance" name="distance" placeholder="15 min" required>
+                <label class="form-label" for="description">Description</label>
+                <textarea class="form-control" id="description" name="description" rows="2"></textarea>
             </div>
 
-            <div class="form-group">
-                <label class="form-label" for="display_order">Ordre d'affichage</label>
-                <input type="number" class="form-control" id="display_order" name="display_order" value="0">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label class="form-label" for="emoji">Emoji</label>
+                    <div class="emoji-input-wrapper">
+                        <input type="text" class="form-control emoji-input" id="emoji" name="emoji" readonly placeholder="Choisir">
+                        <button type="button" class="emoji-trigger" onclick="openEmojiPicker('emoji', this)">🏞️</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="distance">Distance</label>
+                    <input type="text" class="form-control" id="distance" name="distance" placeholder="15 min">
+                </div>
             </div>
 
             <div class="btn-group">
                 <button type="submit" class="btn btn-primary">Enregistrer</button>
                 <button type="button" class="btn btn-secondary" onclick="closeModal('activityModal')">Annuler</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal for Add/Edit Category -->
+<div id="categoryModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title" id="categoryModalTitle">Nouvelle section</h3>
+            <button class="modal-close" onclick="closeModal('categoryModal')">&times;</button>
+        </div>
+
+        <form id="categoryForm">
+            <input type="hidden" id="category_id" name="id">
+
+            <div class="form-group">
+                <label class="form-label" for="cat_name">Nom de la section</label>
+                <input type="text" class="form-control" id="cat_name" name="name" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="cat_icon">Icône</label>
+                <div class="emoji-input-wrapper">
+                    <input type="text" class="form-control emoji-input" id="cat_icon" name="icon" readonly placeholder="Choisir">
+                    <button type="button" class="emoji-trigger" onclick="openEmojiPicker('cat_icon', this)">📍</button>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button type="submit" class="btn btn-primary">Enregistrer</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('categoryModal')">Annuler</button>
             </div>
         </form>
     </div>
@@ -145,61 +297,318 @@
 let activities = [];
 let categories = [];
 
-const categoryIcons = {
-    'Incontournables': '⭐',
-    'Baignade & Kayak': '🏊',
-    'Villes à visiter': '🏛️',
-    'Nature & Randonnées': '🌿',
-    'Marchés provençaux': '🧺',
-    'Gastronomie': '🍽️',
-    'Culture': '📚'
-};
-
+// Load data
 async function loadCategories() {
     try {
-        categories = await fetchAPI('/api/activity-categories');
-        const categorySelect = document.getElementById('category');
-        categorySelect.innerHTML = '<option value="">Sélectionnez une catégorie</option>';
-        categories.forEach(cat => {
-            categorySelect.innerHTML += `<option value="${cat.name}">${cat.name}</option>`;
-        });
+        const propertyId = getCurrentPropertyId();
+        categories = await fetchAPI(`/api/activity-categories?property_id=${propertyId}`);
+        updateCategorySelect();
     } catch (error) {
-        showAlert('Erreur lors du chargement des catégories', 'error');
+        console.error('Error loading categories:', error);
+    }
+}
+
+function updateCategorySelect() {
+    const categorySelect = document.getElementById('category');
+    categorySelect.innerHTML = '<option value="">Sélectionnez une section</option>';
+    categories.forEach(cat => {
+        categorySelect.innerHTML += `<option value="${cat.name}">${cat.icon || '📍'} ${cat.name}</option>`;
+    });
+    categorySelect.innerHTML += '<option value="__new__">+ Créer une nouvelle section...</option>';
+}
+
+document.getElementById('category').addEventListener('change', function() {
+    const newCatInput = document.getElementById('newCategoryInput');
+    if (this.value === '__new__') {
+        newCatInput.classList.add('visible');
+    } else {
+        newCatInput.classList.remove('visible');
+    }
+});
+
+async function createCategoryInline() {
+    const name = document.getElementById('newCategoryName').value.trim();
+    if (!name) {
+        showAlert('Entrez un nom de section', 'error');
+        return;
+    }
+
+    const icon = document.getElementById('newCategoryIcon').value || '📍';
+    const propertyId = getCurrentPropertyId();
+    try {
+        const response = await fetch(`/api/activity-categories?property_id=${propertyId}`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ name, icon })
+        });
+        if (response.ok) {
+            await loadCategories();
+            document.getElementById('category').value = name;
+            document.getElementById('newCategoryInput').classList.remove('visible');
+            document.getElementById('newCategoryName').value = '';
+            document.getElementById('newCategoryIcon').value = '';
+            // Reset emoji picker button
+            const emojiTrigger = document.querySelector('#newCategoryInput .emoji-trigger');
+            if (emojiTrigger) emojiTrigger.textContent = '📍';
+            showAlert('Section créée', 'success');
+        }
+    } catch (error) {
+        showAlert('Erreur lors de la création', 'error');
     }
 }
 
 async function loadActivities() {
     try {
         activities = await fetchAPI('/api/activities');
-        renderActivities();
+        renderSections();
         updatePreview();
     } catch (error) {
-        showAlert('Erreur lors du chargement des activités', 'error');
+        showAlert('Erreur lors du chargement', 'error');
     }
 }
 
-function updatePreview() {
-    const previewContainer = document.getElementById('preview-activities');
+function renderSections() {
+    const container = document.getElementById('sectionsContainer');
 
-    // Group by category
+    if (categories.length === 0 && activities.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">🎯</div>
+                <div class="empty-state-text">Aucune activité</div>
+                <p style="color: var(--text-muted);">Cliquez sur "+ Ajouter" pour commencer</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Group activities by category
     const grouped = {};
-    activities.forEach(activity => {
-        if (!grouped[activity.category]) {
-            grouped[activity.category] = [];
-        }
-        grouped[activity.category].push(activity);
+    activities.forEach(a => {
+        if (!grouped[a.category]) grouped[a.category] = [];
+        grouped[a.category].push(a);
+    });
+
+    // Sort activities within each category by display_order
+    Object.keys(grouped).forEach(cat => {
+        grouped[cat].sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
     });
 
     let html = '';
-    Object.keys(grouped).slice(0, 3).forEach(category => {
-        const icon = categoryIcons[category] || '📍';
-        const items = grouped[category].slice(0, 3);
+    categories.forEach(cat => {
+        const catActivities = grouped[cat.name] || [];
+        const icon = cat.icon || '📍';
+
+        html += `
+            <div class="section-card" data-category-id="${cat.id}" data-category-name="${cat.name}" draggable="true">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <div class="section-header-left">
+                        <span class="section-drag-handle">⋮⋮</span>
+                        <span class="section-icon">${icon}</span>
+                        <span class="section-name">${cat.name}</span>
+                        <span class="section-count">(${catActivities.length})</span>
+                    </div>
+                    <div class="section-actions" onclick="event.stopPropagation()">
+                        <button class="btn btn-sm btn-icon btn-secondary" onclick="editCategory(${cat.id})" title="Modifier">✏️</button>
+                        <button class="btn btn-sm btn-icon btn-danger" onclick="deleteCategory(${cat.id})" title="Supprimer">🗑️</button>
+                        <span class="chevron">▼</span>
+                    </div>
+                </div>
+                <div class="section-content" data-category="${cat.name}">
+                    <div class="drop-zone" data-category="${cat.name}">
+                        ${catActivities.map(a => renderActivityItem(a)).join('')}
+                        <div class="add-activity-btn" data-category="${cat.name.replace(/"/g, '&quot;')}" onclick="openAddModalForCategory(this.dataset.category)">
+                            <span>+</span> Ajouter une activité
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+    initDragAndDrop();
+}
+
+function renderActivityItem(activity) {
+    return `
+        <div class="activity-item" data-activity-id="${activity.id}" draggable="true">
+            <span class="activity-drag-handle">⋮⋮</span>
+            <span class="activity-emoji">${activity.emoji || '📍'}</span>
+            <div class="activity-info">
+                <div class="activity-name">${activity.name}</div>
+                <div class="activity-desc">${activity.description || ''}</div>
+            </div>
+            ${activity.distance ? `<span class="activity-distance">${activity.distance}</span>` : ''}
+            <div class="activity-actions">
+                <button class="btn btn-sm btn-icon btn-secondary" onclick="editActivity(${activity.id})" title="Modifier">✏️</button>
+                <button class="btn btn-sm btn-icon btn-danger" onclick="deleteActivity(${activity.id})" title="Supprimer">🗑️</button>
+            </div>
+        </div>
+    `;
+}
+
+function toggleSection(header) {
+    const content = header.nextElementSibling;
+    const chevron = header.querySelector('.chevron');
+    content.classList.toggle('expanded');
+    chevron.classList.toggle('expanded');
+}
+
+// Drag and Drop
+function initDragAndDrop() {
+    // Section drag and drop
+    const sections = document.querySelectorAll('.section-card');
+    sections.forEach(section => {
+        section.addEventListener('dragstart', handleSectionDragStart);
+        section.addEventListener('dragend', handleSectionDragEnd);
+        section.addEventListener('dragover', handleSectionDragOver);
+        section.addEventListener('drop', handleSectionDrop);
+    });
+
+    // Activity drag and drop
+    const activityItems = document.querySelectorAll('.activity-item');
+    activityItems.forEach(item => {
+        item.addEventListener('dragstart', handleActivityDragStart);
+        item.addEventListener('dragend', handleActivityDragEnd);
+    });
+
+    const dropZones = document.querySelectorAll('.drop-zone');
+    dropZones.forEach(zone => {
+        zone.addEventListener('dragover', handleActivityDragOver);
+        zone.addEventListener('dragleave', handleActivityDragLeave);
+        zone.addEventListener('drop', handleActivityDrop);
+    });
+}
+
+let draggedSection = null;
+let draggedActivity = null;
+
+function handleSectionDragStart(e) {
+    draggedSection = this;
+    this.querySelector('.section-header').classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleSectionDragEnd(e) {
+    this.querySelector('.section-header').classList.remove('dragging');
+    draggedSection = null;
+}
+
+function handleSectionDragOver(e) {
+    e.preventDefault();
+    if (!draggedSection || draggedSection === this) return;
+
+    const container = document.getElementById('sectionsContainer');
+    const sections = [...container.querySelectorAll('.section-card')];
+    const currentIndex = sections.indexOf(this);
+    const draggedIndex = sections.indexOf(draggedSection);
+
+    if (currentIndex !== draggedIndex) {
+        if (currentIndex < draggedIndex) {
+            container.insertBefore(draggedSection, this);
+        } else {
+            container.insertBefore(draggedSection, this.nextSibling);
+        }
+    }
+}
+
+function handleSectionDrop(e) {
+    e.preventDefault();
+    saveSectionOrder();
+}
+
+async function saveSectionOrder() {
+    const sections = document.querySelectorAll('.section-card');
+    const categoryIds = [...sections].map(s => parseInt(s.dataset.categoryId));
+
+    const propertyId = getCurrentPropertyId();
+    try {
+        await fetch(`/api/activity-categories/reorder?property_id=${propertyId}`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ category_ids: categoryIds })
+        });
+    } catch (error) {
+        console.error('Error saving order:', error);
+    }
+}
+
+function handleActivityDragStart(e) {
+    draggedActivity = this;
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.stopPropagation();
+}
+
+function handleActivityDragEnd(e) {
+    this.classList.remove('dragging');
+    draggedActivity = null;
+}
+
+function handleActivityDragOver(e) {
+    e.preventDefault();
+    if (!draggedActivity) return;
+    this.classList.add('drag-over');
+}
+
+function handleActivityDragLeave(e) {
+    this.classList.remove('drag-over');
+}
+
+function handleActivityDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.classList.remove('drag-over');
+
+    if (!draggedActivity) return;
+
+    const category = this.dataset.category;
+    const addBtn = this.querySelector('.add-activity-btn');
+
+    // Insert before the add button
+    this.insertBefore(draggedActivity, addBtn);
+
+    // Save the new order
+    saveActivityOrder(category);
+}
+
+async function saveActivityOrder(category) {
+    const zone = document.querySelector(`.drop-zone[data-category="${category}"]`);
+    const items = zone.querySelectorAll('.activity-item');
+    const activityIds = [...items].map(item => parseInt(item.dataset.activityId));
+
+    const propertyId = getCurrentPropertyId();
+    try {
+        await fetch(`/api/activities/reorder?property_id=${propertyId}`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ category, activity_ids: activityIds })
+        });
+    } catch (error) {
+        console.error('Error saving activity order:', error);
+    }
+}
+
+// Preview
+function updatePreview() {
+    const previewContainer = document.getElementById('preview-activities');
+
+    const grouped = {};
+    activities.forEach(a => {
+        if (!grouped[a.category]) grouped[a.category] = [];
+        grouped[a.category].push(a);
+    });
+
+    let html = '';
+    categories.slice(0, 3).forEach(cat => {
+        const items = (grouped[cat.name] || []).slice(0, 3);
+        if (items.length === 0) return;
 
         html += `
             <div class="preview-card">
                 <div class="preview-card-header">
-                    <span>${icon}</span>
-                    <strong>${category}</strong>
+                    <span>${cat.icon || '📍'}</span>
+                    <strong>${cat.name}</strong>
                 </div>
                 <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;">
                     ${items.map(a => `<span style="font-size: 8px; background: #f3f4f6; padding: 2px 6px; border-radius: 8px;">${a.name}</span>`).join('')}
@@ -208,84 +617,23 @@ function updatePreview() {
         `;
     });
 
-    previewContainer.innerHTML = html;
+    previewContainer.innerHTML = html || '<p style="text-align: center; color: #9ca3af; font-size: 10px;">Aucune activité</p>';
 }
 
-function renderActivities() {
-    const container = document.getElementById('activitiesTable');
-
-    if (activities.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state-icon">🎯</div>
-                <div class="empty-state-text">Aucune activité</div>
-            </div>
-        `;
-        return;
-    }
-
-    // Group by category
-    const grouped = {};
-    activities.forEach(activity => {
-        if (!grouped[activity.category]) {
-            grouped[activity.category] = [];
-        }
-        grouped[activity.category].push(activity);
-    });
-
-    let html = '';
-    Object.keys(grouped).forEach(category => {
-        html += `
-            <h3 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--primary-color);">${categoryIcons[category] || '📍'} ${category}</h3>
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Emoji</th>
-                        <th>Nom</th>
-                        <th>Description</th>
-                        <th>Distance</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-
-        grouped[category].forEach(activity => {
-            html += `
-                <tr>
-                    <td>${activity.emoji}</td>
-                    <td>${activity.name}</td>
-                    <td>${activity.description}</td>
-                    <td>${activity.distance}</td>
-                    <td class="action-buttons">
-                        <button class="btn btn-sm btn-primary" onclick="editActivity(${activity.id})">Modifier</button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteActivity(${activity.id})">Supprimer</button>
-                    </td>
-                </tr>
-            `;
-        });
-
-        html += `
-                </tbody>
-            </table>
-        `;
-    });
-
-    container.innerHTML = html;
-}
-
+// Modal functions
 function openAddModal() {
     document.getElementById('modalTitle').textContent = 'Ajouter une activité';
     document.getElementById('activityForm').reset();
     document.getElementById('activity_id').value = '';
-
-    // Reset emoji trigger button
+    document.getElementById('newCategoryInput').classList.remove('visible');
     const emojiTrigger = document.querySelector('#activityForm .emoji-trigger');
-    if (emojiTrigger) {
-        emojiTrigger.textContent = '🏞️';
-    }
-
+    if (emojiTrigger) emojiTrigger.textContent = '🏞️';
     openModal('activityModal');
+}
+
+function openAddModalForCategory(categoryName) {
+    openAddModal();
+    document.getElementById('category').value = categoryName;
 }
 
 async function editActivity(id) {
@@ -296,80 +644,172 @@ async function editActivity(id) {
     document.getElementById('activity_id').value = activity.id;
     loadDataIntoForm(activity, 'activityForm');
 
-    // Update emoji trigger button
     const emojiTrigger = document.querySelector('#activityForm .emoji-trigger');
-    if (emojiTrigger && activity.emoji) {
-        emojiTrigger.textContent = activity.emoji;
-    }
+    if (emojiTrigger && activity.emoji) emojiTrigger.textContent = activity.emoji;
 
     openModal('activityModal');
 }
 
 async function deleteActivity(id) {
-    if (!confirmAction('Êtes-vous sûr de vouloir supprimer cette activité ?')) {
-        return;
-    }
-
-    const headers = getAuthHeaders();
-    if (!headers) return;
+    if (!confirmAction('Supprimer cette activité ?')) return;
 
     try {
         const response = await fetch(`/api/activities/${id}`, {
             method: 'DELETE',
-            headers: headers
+            headers: getAuthHeaders()
         });
-
-        const result = await response.json();
-
         if (response.ok) {
-            showAlert(result.message, 'success');
+            showAlert('Activité supprimée', 'success');
             loadActivities();
-        } else {
-            showAlert('Erreur: ' + (result.error || 'Échec de la suppression'), 'error');
         }
     } catch (error) {
-        showAlert('Erreur de connexion', 'error');
+        showAlert('Erreur', 'error');
     }
 }
 
+function openCategoryModal() {
+    document.getElementById('categoryModalTitle').textContent = 'Nouvelle section';
+    document.getElementById('categoryForm').reset();
+    document.getElementById('category_id').value = '';
+    const emojiTrigger = document.querySelector('#categoryForm .emoji-trigger');
+    if (emojiTrigger) emojiTrigger.textContent = '📍';
+    openModal('categoryModal');
+}
+
+async function editCategory(id) {
+    const cat = categories.find(c => c.id === id);
+    if (!cat) return;
+
+    document.getElementById('categoryModalTitle').textContent = 'Modifier la section';
+    document.getElementById('category_id').value = cat.id;
+    document.getElementById('cat_name').value = cat.name;
+    document.getElementById('cat_icon').value = cat.icon || '';
+    const emojiTrigger = document.querySelector('#categoryForm .emoji-trigger');
+    if (emojiTrigger) emojiTrigger.textContent = cat.icon || '📍';
+
+    openModal('categoryModal');
+}
+
+async function deleteCategory(id) {
+    const cat = categories.find(c => c.id === id);
+    if (!cat) return;
+
+    if (!confirmAction(`Supprimer la section "${cat.name}" et toutes ses activités ?`)) return;
+
+    try {
+        const response = await fetch(`/api/activity-categories/${id}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+        });
+        if (response.ok) {
+            showAlert('Section supprimée', 'success');
+            loadCategories().then(() => loadActivities());
+        }
+    } catch (error) {
+        showAlert('Erreur', 'error');
+    }
+}
+
+// Form submissions
 document.getElementById('activityForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-
-    const headers = getAuthHeaders();
-    if (!headers) return;
 
     const formData = getFormData('activityForm');
     const activityId = document.getElementById('activity_id').value;
     const propertyId = getCurrentPropertyId();
 
+    // Si l'utilisateur a sélectionné "Créer une nouvelle section" mais n'a pas cliqué sur Créer
+    if (formData.category === '__new__') {
+        const newCatName = document.getElementById('newCategoryName').value.trim();
+        if (!newCatName) {
+            showAlert('Veuillez créer la section avant d\'enregistrer', 'error');
+            return;
+        }
+        // Créer la section automatiquement
+        const icon = document.getElementById('newCategoryIcon').value || '📍';
+        try {
+            const catResponse = await fetch(`/api/activity-categories?property_id=${propertyId}`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ name: newCatName, icon })
+            });
+            if (catResponse.ok) {
+                formData.category = newCatName;
+                await loadCategories();
+            } else {
+                showAlert('Erreur lors de la création de la section', 'error');
+                return;
+            }
+        } catch (error) {
+            showAlert('Erreur lors de la création de la section', 'error');
+            return;
+        }
+    }
+
     const url = activityId
         ? `/api/activities/${activityId}?property_id=${propertyId}`
         : `/api/activities?property_id=${propertyId}`;
-    const method = activityId ? 'PUT' : 'POST';
 
     try {
         const response = await fetch(url, {
-            method: method,
-            headers: headers,
+            method: activityId ? 'PUT' : 'POST',
+            headers: getAuthHeaders(),
             body: JSON.stringify(formData)
         });
 
-        const result = await response.json();
-
         if (response.ok) {
-            showAlert(result.message, 'success');
+            showAlert(activityId ? 'Activité modifiée' : 'Activité créée', 'success');
             closeModal('activityModal');
-            loadActivities();
+            // Nettoyer les champs de création de section
+            document.getElementById('newCategoryInput').classList.remove('visible');
+            document.getElementById('newCategoryName').value = '';
+            document.getElementById('newCategoryIcon').value = '';
+            // Recharger les catégories puis les activités pour afficher les nouvelles sections
+            loadCategories().then(() => loadActivities());
         } else {
-            showAlert('Erreur: ' + (result.error || 'Échec de l\'opération'), 'error');
+            const result = await response.json();
+            showAlert('Erreur: ' + (result.error || 'Échec'), 'error');
         }
     } catch (error) {
         showAlert('Erreur de connexion', 'error');
     }
 });
 
-// Load data on page load
-loadCategories();
-loadActivities();
+document.getElementById('categoryForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const categoryId = document.getElementById('category_id').value;
+    const propertyId = getCurrentPropertyId();
+    const data = {
+        name: document.getElementById('cat_name').value,
+        icon: document.getElementById('cat_icon').value || '📍'
+    };
+
+    const url = categoryId
+        ? `/api/activity-categories/${categoryId}?property_id=${propertyId}`
+        : `/api/activity-categories?property_id=${propertyId}`;
+
+    try {
+        const response = await fetch(url, {
+            method: categoryId ? 'PUT' : 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            showAlert(categoryId ? 'Section modifiée' : 'Section créée', 'success');
+            closeModal('categoryModal');
+            loadCategories().then(() => loadActivities());
+        } else {
+            const result = await response.json();
+            showAlert('Erreur: ' + (result.error || 'Échec'), 'error');
+        }
+    } catch (error) {
+        showAlert('Erreur de connexion', 'error');
+    }
+});
+
+// Initialize
+loadCategories().then(() => loadActivities());
 </script>
 {% endblock %}

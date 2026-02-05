@@ -9,6 +9,7 @@ import hashlib
 import secrets
 import os
 import re
+import time
 import smtplib
 import uuid
 from datetime import datetime, timedelta
@@ -1064,7 +1065,7 @@ def create_activity():
     if not property_id:
         return jsonify({'error': 'Accès non autorisé à cette propriété'}), 403
     data = request.json
-    activity_id = db.create_activity(data, property_id)
+    activity_id = db.create_activity(property_id, data)
     return jsonify({'success': True, 'id': activity_id, 'message': 'Activité créée'})
 
 @app.route('/api/activities/<int:activity_id>', methods=['PUT'])
@@ -1083,8 +1084,49 @@ def delete_activity(activity_id):
 # API Routes - Activity Categories
 @app.route('/api/activity-categories', methods=['GET'])
 def get_activity_categories():
-    data = db.get_all_activity_categories()
+    property_id = get_property_id()
+    data = db.get_all_activity_categories(property_id)
     return jsonify(data)
+
+@app.route('/api/activity-categories', methods=['POST'])
+@requires_auth
+def create_activity_category():
+    property_id = get_verified_property_id()
+    if not property_id:
+        return jsonify({'error': 'Accès non autorisé à cette propriété'}), 403
+    data = request.json
+    category_id = db.create_activity_category(property_id, data)
+    return jsonify({'success': True, 'id': category_id, 'message': 'Catégorie créée'})
+
+@app.route('/api/activity-categories/<int:category_id>', methods=['PUT'])
+@requires_auth
+def update_activity_category(category_id):
+    data = request.json
+    db.update_activity_category(category_id, data)
+    return jsonify({'success': True, 'message': 'Catégorie mise à jour'})
+
+@app.route('/api/activity-categories/<int:category_id>', methods=['DELETE'])
+@requires_auth
+def delete_activity_category(category_id):
+    db.delete_activity_category(category_id)
+    return jsonify({'success': True, 'message': 'Catégorie supprimée'})
+
+@app.route('/api/activity-categories/reorder', methods=['POST'])
+@requires_auth
+def reorder_activity_categories():
+    property_id = get_verified_property_id()
+    if not property_id:
+        return jsonify({'error': 'Accès non autorisé à cette propriété'}), 403
+    data = request.json
+    db.reorder_activity_categories(property_id, data.get('category_ids', []))
+    return jsonify({'success': True, 'message': 'Ordre mis à jour'})
+
+@app.route('/api/activities/reorder', methods=['POST'])
+@requires_auth
+def reorder_activities():
+    data = request.json
+    db.reorder_activities(data.get('category'), data.get('activity_ids', []))
+    return jsonify({'success': True, 'message': 'Ordre mis à jour'})
 
 # API Routes - Nearby Services
 @app.route('/api/services', methods=['GET'])
@@ -1466,6 +1508,90 @@ def get_account_info():
     if account_info:
         return jsonify(account_info)
     return jsonify({'error': 'Compte non trouvé'}), 404
+
+@app.route('/api/account', methods=['DELETE'])
+@requires_auth
+def delete_account():
+    """Delete user account and all associated data"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Non authentifié'}), 401
+
+    try:
+        # Delete all user properties and their data
+        properties = db.get_all_user_properties(current_user.id)
+        for prop in properties:
+            db.delete_property_with_data(prop['id'])
+
+        # Delete user avatar if exists
+        account_info = db.get_account_info(current_user.id)
+        if account_info and account_info.get('avatar'):
+            avatar_path = os.path.join(app.config['UPLOAD_FOLDER'], account_info['avatar'])
+            if os.path.exists(avatar_path):
+                os.remove(avatar_path)
+
+        # Delete user account
+        db.delete_user(current_user.id)
+
+        return jsonify({'message': 'Compte supprimé avec succès'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/account/avatar', methods=['POST'])
+@requires_auth
+def upload_account_avatar():
+    """Upload avatar for user account"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Non authentifié'}), 401
+
+    if 'avatar' not in request.files:
+        return jsonify({'error': 'Aucun fichier fourni'}), 400
+
+    file = request.files['avatar']
+    if file.filename == '':
+        return jsonify({'error': 'Aucun fichier sélectionné'}), 400
+
+    if file and allowed_file(file.filename):
+        # Generate unique filename
+        ext = file.filename.rsplit('.', 1)[1].lower()
+        filename = f"user_avatar_{current_user.id}_{int(time.time())}.{ext}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+        # Delete old avatar if exists
+        account_info = db.get_account_info(current_user.id)
+        if account_info and account_info.get('avatar'):
+            old_path = os.path.join(app.config['UPLOAD_FOLDER'], account_info['avatar'])
+            if os.path.exists(old_path):
+                os.remove(old_path)
+
+        file.save(filepath)
+
+        # Update database
+        db.update_user_avatar(current_user.id, filename)
+
+        return jsonify({'success': True, 'avatar': filename})
+
+    return jsonify({'error': 'Type de fichier non autorisé'}), 400
+
+@app.route('/api/account/avatar', methods=['DELETE'])
+@requires_auth
+def delete_account_avatar():
+    """Delete avatar for user account"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Non authentifié'}), 401
+
+    account_info = db.get_account_info(current_user.id)
+    if account_info and account_info.get('avatar'):
+        avatar_path = os.path.join(app.config['UPLOAD_FOLDER'], account_info['avatar'])
+        if os.path.exists(avatar_path):
+            os.remove(avatar_path)
+
+        db.update_user_avatar(current_user.id, None)
+        return jsonify({'success': True, 'message': 'Avatar supprimé'})
+
+    return jsonify({'error': 'Aucun avatar à supprimer'}), 404
 
 @app.route('/api/subscription', methods=['GET'])
 @requires_auth

@@ -7,6 +7,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Leaflet for maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         :root {
             /* Theme colors - Provence */
@@ -1020,10 +1023,12 @@
             </div>
 
             <div class="wifi-qr-container">
-                <div class="wifi-qr">
-                    <canvas id="wifiQRCode"></canvas>
+                <div class="wifi-qr" id="wifiQRCode" style="display: flex; justify-content: center;">
                 </div>
                 <div style="margin-top: 12px; font-size: 13px; color: var(--text-secondary);">📱 Scannez avec l'appareil photo</div>
+                <button onclick="downloadWiFiQR()" style="margin-top: 12px; background: var(--accent-color); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 14px; cursor: pointer;">
+                    💾 Enregistrer le QR Code
+                </button>
             </div>
 
             <div style="font-weight: 600; margin-bottom: 12px;">Ou connectez-vous manuellement</div>
@@ -1061,11 +1066,8 @@
             <h1>Adresse</h1>
         </div>
         <div class="detail-content">
-            <div class="map-container">
-                <div class="map-placeholder">
-                    <div class="map-icon">🗺️</div>
-                    <div>Carte</div>
-                </div>
+            <div class="map-container" id="addressMapContainer">
+                <div id="addressMap" style="width: 100%; height: 200px; border-radius: 12px; z-index: 1;"></div>
             </div>
 
             <div class="card">
@@ -1191,8 +1193,8 @@
         </div>
     </div>
 
-    <!-- QR Code Library -->
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <!-- QR Code Library - using reliable CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 
     <script>
         // Property data from server
@@ -1226,8 +1228,28 @@
         }
 
         // Detail view management
+        let mapInitialized = false;
         function openDetail(detailName) {
-            document.getElementById(`detail-${detailName}`).classList.add('active');
+            const detailView = document.getElementById(`detail-${detailName}`);
+            if (detailView) {
+                detailView.classList.add('active');
+            }
+            // Initialize map when address detail is opened
+            if (detailName === 'address' && !mapInitialized) {
+                console.log('Opening address detail, initializing map...');
+                // Wait for the detail view animation to complete
+                setTimeout(() => {
+                    initAddressMap();
+                    mapInitialized = true;
+                }, 350);
+            }
+            // Generate QR code when WiFi detail is opened (in case it wasn't generated)
+            if (detailName === 'wifi') {
+                const container = document.getElementById('wifiQRCode');
+                if (container && container.innerHTML.trim() === '') {
+                    generateWiFiQR();
+                }
+            }
         }
 
         function closeDetail(detailName) {
@@ -1242,19 +1264,86 @@
         }
 
         // Generate WiFi QR Code
+        let wifiQRCodeInstance = null;
         function generateWiFiQR() {
             const ssid = propertyData.wifi?.ssid || '';
             const password = propertyData.wifi?.password || '';
+            const container = document.getElementById('wifiQRCode');
+
+            console.log('WiFi QR generation - ssid:', ssid, 'password:', password ? '***' : 'empty');
+
+            if (!container) {
+                console.error('QR container not found');
+                return;
+            }
+
             if (ssid && password) {
                 const wifiString = `WIFI:T:WPA;S:${ssid};P:${password};;`;
-                const canvas = document.getElementById('wifiQRCode');
-                if (canvas && typeof QRCode !== 'undefined') {
-                    QRCode.toCanvas(canvas, wifiString, {
-                        width: 160,
-                        margin: 2,
-                        color: { dark: '#000000', light: '#FFFFFF' }
-                    });
-                }
+                console.log('WiFi string:', wifiString);
+
+                // Clear previous QR code
+                container.innerHTML = '';
+
+                // Wait a bit for the library to be ready
+                setTimeout(() => {
+                    if (typeof QRCode !== 'undefined') {
+                        try {
+                            wifiQRCodeInstance = new QRCode(container, {
+                                text: wifiString,
+                                width: 160,
+                                height: 160,
+                                colorDark: '#000000',
+                                colorLight: '#ffffff',
+                                correctLevel: QRCode.CorrectLevel.M
+                            });
+                            console.log('QR Code generated successfully');
+                        } catch (error) {
+                            console.error('QR Code error:', error);
+                            container.innerHTML = `
+                                <div style="width: 160px; height: 160px; display: flex; align-items: center; justify-content: center; background: #f0f0f0; border-radius: 8px;">
+                                    <span style="font-size: 48px;">📶</span>
+                                </div>
+                            `;
+                        }
+                    } else {
+                        console.error('QRCode library not loaded');
+                        container.innerHTML = `
+                            <div style="width: 160px; height: 160px; display: flex; align-items: center; justify-content: center; background: #f0f0f0; border-radius: 8px;">
+                                <span style="font-size: 48px;">📶</span>
+                            </div>
+                        `;
+                    }
+                }, 100);
+            } else {
+                container.innerHTML = `
+                    <div style="width: 160px; height: 160px; display: flex; align-items: center; justify-content: center; background: #f0f0f0; border-radius: 8px; flex-direction: column;">
+                        <span style="font-size: 32px;">📶</span>
+                        <span style="font-size: 12px; color: #666; margin-top: 8px;">WiFi non configuré</span>
+                    </div>
+                `;
+            }
+        }
+
+        // Download WiFi QR Code as image
+        function downloadWiFiQR() {
+            const container = document.getElementById('wifiQRCode');
+            if (!container) return;
+
+            // qrcodejs creates either a canvas or img element inside the container
+            const canvas = container.querySelector('canvas');
+            const img = container.querySelector('img');
+
+            const link = document.createElement('a');
+            link.download = 'wifi-qrcode.png';
+
+            if (canvas) {
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            } else if (img) {
+                link.href = img.src;
+                link.click();
+            } else {
+                alert('QR Code non disponible');
             }
         }
 
@@ -1514,6 +1603,105 @@
             `).join('');
 
             document.getElementById('accessPhotos').innerHTML = html;
+        }
+
+        // Initialize map
+        let addressMap = null;
+        function initAddressMap() {
+            console.log('Initializing address map...');
+            const address = propertyData.address;
+            if (!address) {
+                console.error('No address data available');
+                return;
+            }
+
+            console.log('Address data:', address);
+
+            // Check if we have coordinates stored
+            const lat = address.latitude || null;
+            const lng = address.longitude || null;
+
+            if (lat && lng) {
+                console.log('Using stored coordinates:', lat, lng);
+                createMap(lat, lng);
+            } else {
+                // Geocode the address using Nominatim
+                const fullAddr = `${address.street || ''}, ${address.postal_code || ''} ${address.city || ''}, ${address.country || 'France'}`;
+                console.log('Geocoding address:', fullAddr);
+                fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddr)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        console.log('Nominatim response:', data);
+                        if (data && data.length > 0) {
+                            createMap(parseFloat(data[0].lat), parseFloat(data[0].lon));
+                        } else {
+                            // Default to France center
+                            console.log('No results, using default France coordinates');
+                            createMap(46.2276, 2.2137, 5);
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Geocoding error:', err);
+                        // Show placeholder on error
+                        document.getElementById('addressMapContainer').innerHTML = `
+                            <div class="map-placeholder" style="height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f0f0f0; border-radius: 12px;">
+                                <div style="font-size: 32px;">🗺️</div>
+                                <div style="color: #666; margin-top: 8px;">Carte non disponible</div>
+                            </div>
+                        `;
+                    });
+            }
+        }
+
+        function createMap(lat, lng, zoom = 15) {
+            console.log('Creating map at:', lat, lng, 'zoom:', zoom);
+            const mapContainer = document.getElementById('addressMap');
+            if (!mapContainer) {
+                console.error('Map container not found');
+                return;
+            }
+
+            // Make sure container is visible and has dimensions
+            mapContainer.style.width = '100%';
+            mapContainer.style.height = '200px';
+
+            if (addressMap) {
+                addressMap.remove();
+                addressMap = null;
+            }
+
+            try {
+                addressMap = L.map('addressMap', {
+                    zoomControl: false,
+                    dragging: true,
+                    scrollWheelZoom: false
+                }).setView([lat, lng], zoom);
+
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OSM'
+                }).addTo(addressMap);
+
+                // Add marker
+                const marker = L.marker([lat, lng]).addTo(addressMap);
+                marker.bindPopup(`<strong>{{ property.name }}</strong>`);
+
+                // Force map to recalculate size after container is visible
+                setTimeout(() => {
+                    addressMap.invalidateSize();
+                    console.log('Map invalidateSize called');
+                }, 200);
+
+                // Additional invalidateSize after a longer delay for slower rendering
+                setTimeout(() => {
+                    if (addressMap) {
+                        addressMap.invalidateSize();
+                    }
+                }, 500);
+
+                console.log('Map created successfully');
+            } catch (err) {
+                console.error('Map creation error:', err);
+            }
         }
 
         // Initialize

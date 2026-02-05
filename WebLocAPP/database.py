@@ -334,6 +334,9 @@ class Database:
         # Migrate: add password_plain column to users if it doesn't exist
         self._migrate_add_password_plain_to_users(cursor, conn)
 
+        # Migrate: add avatar column to users if it doesn't exist
+        self._migrate_add_avatar_to_users(cursor, conn)
+
         # Migrate: insert default app config values
         self._migrate_insert_default_app_config(cursor, conn)
 
@@ -412,6 +415,15 @@ class Database:
 
         if 'password_plain' not in columns:
             cursor.execute('ALTER TABLE users ADD COLUMN password_plain TEXT')
+            conn.commit()
+
+    def _migrate_add_avatar_to_users(self, cursor, conn):
+        """Migration: Add avatar column to users for account avatar"""
+        cursor.execute("PRAGMA table_info(users)")
+        columns = [col[1] for col in cursor.fetchall()]
+
+        if 'avatar' not in columns:
+            cursor.execute('ALTER TABLE users ADD COLUMN avatar TEXT')
             conn.commit()
 
     def _migrate_insert_default_app_config(self, cursor, conn):
@@ -1358,9 +1370,116 @@ class Database:
 
     def get_all_activity_categories(self, property_id=1):
         conn = self.get_connection()
+        # First, sync categories from existing activities
+        self._sync_activity_categories(property_id, conn)
         results = conn.execute('SELECT * FROM activity_categories WHERE property_id=? ORDER BY display_order', (property_id,)).fetchall()
         conn.close()
         return [dict(row) for row in results]
+
+    def _sync_activity_categories(self, property_id, conn):
+        """Auto-create categories from existing activities that don't have a category entry"""
+        cursor = conn.cursor()
+        # Get all unique categories from activities
+        activity_cats = cursor.execute(
+            'SELECT DISTINCT category FROM activities WHERE property_id=? AND category IS NOT NULL AND category != ""',
+            (property_id,)
+        ).fetchall()
+
+        # Get existing category names
+        existing_cats = cursor.execute(
+            'SELECT name FROM activity_categories WHERE property_id=?',
+            (property_id,)
+        ).fetchall()
+        existing_names = {row['name'] for row in existing_cats}
+
+        # Default icons for common categories
+        default_icons = {
+            'Incontournables': '⭐',
+            'Baignade & Kayak': '🏊',
+            'Villes à visiter': '🏛️',
+            'Nature & Randonnées': '🌿',
+            'Marchés provençaux': '🧺',
+            'Gastronomie': '🍽️',
+            'Culture': '📚',
+            'Sports': '⚽',
+            'Famille': '👨‍👩‍👧‍👦'
+        }
+
+        # Get current max order
+        max_order = cursor.execute(
+            'SELECT MAX(display_order) FROM activity_categories WHERE property_id=?',
+            (property_id,)
+        ).fetchone()[0] or 0
+
+        # Create missing categories
+        for row in activity_cats:
+            cat_name = row['category']
+            if cat_name and cat_name not in existing_names:
+                max_order += 1
+                icon = default_icons.get(cat_name, '📍')
+                cursor.execute('''
+                    INSERT INTO activity_categories (property_id, name, icon, display_order)
+                    VALUES (?, ?, ?, ?)
+                ''', (property_id, cat_name, icon, max_order))
+
+        conn.commit()
+
+    def create_activity_category(self, property_id, data):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        # Get max display_order
+        max_order = cursor.execute('SELECT MAX(display_order) FROM activity_categories WHERE property_id=?', (property_id,)).fetchone()[0] or 0
+        cursor.execute('''
+            INSERT INTO activity_categories (property_id, name, icon, color, display_order)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (property_id, data['name'], data.get('icon', '📍'), data.get('color', ''), max_order + 1))
+        category_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return category_id
+
+    def update_activity_category(self, category_id, data):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE activity_categories
+            SET name=?, icon=?, color=?, updated_at=CURRENT_TIMESTAMP
+            WHERE id=?
+        ''', (data['name'], data.get('icon', '📍'), data.get('color', ''), category_id))
+        conn.commit()
+        conn.close()
+
+    def delete_activity_category(self, category_id):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        # Get category name first
+        cat = cursor.execute('SELECT name FROM activity_categories WHERE id=?', (category_id,)).fetchone()
+        if cat:
+            # Delete activities in this category
+            cursor.execute('DELETE FROM activities WHERE category=?', (cat['name'],))
+        cursor.execute('DELETE FROM activity_categories WHERE id=?', (category_id,))
+        conn.commit()
+        conn.close()
+
+    def reorder_activity_categories(self, property_id, category_ids):
+        """Reorder categories based on the provided list of IDs"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        for order, cat_id in enumerate(category_ids):
+            cursor.execute('UPDATE activity_categories SET display_order=? WHERE id=? AND property_id=?',
+                         (order, cat_id, property_id))
+        conn.commit()
+        conn.close()
+
+    def reorder_activities(self, category_name, activity_ids):
+        """Reorder activities within a category based on the provided list of IDs"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        for order, activity_id in enumerate(activity_ids):
+            cursor.execute('UPDATE activities SET display_order=? WHERE id=? AND category=?',
+                         (order, activity_id, category_name))
+        conn.commit()
+        conn.close()
 
     # ==================== Export ====================
 
@@ -1970,8 +2089,32 @@ class Database:
         """Get account info for a user"""
         conn = self.get_connection()
         result = conn.execute('''
-            SELECT id, email, firstname, lastname, created_at, updated_at
+            SELECT id, email, firstname, lastname, avatar, created_at, updated_at
             FROM users WHERE id=?
         ''', (user_id,)).fetchone()
         conn.close()
         return dict(result) if result else None
+
+    def update_user_avatar(self, user_id, avatar):
+        """Update user avatar"""
+        conn = self.get_connection()
+        conn.execute('''
+            UPDATE users SET avatar=?, updated_at=CURRENT_TIMESTAMP
+            WHERE id=?
+        ''', (avatar, user_id))
+        conn.commit()
+        conn.close()
+
+    def delete_user(self, user_id):
+        """Delete a user account"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        # Delete subscription
+        cursor.execute('DELETE FROM subscriptions WHERE user_id=?', (user_id,))
+
+        # Delete the user
+        cursor.execute('DELETE FROM users WHERE id=?', (user_id,))
+
+        conn.commit()
+        conn.close()

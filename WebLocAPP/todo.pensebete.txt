@@ -2,6 +2,7 @@
 
 - revoir la configuration et le bon fonctionnement de la fonction mot de passe oublié
 - rediriger vers la page de connexion si les identifiants sont perdus lors du refresh d'une page admin
+- verifier qr code et plan dans rendu
 
 === PROCHAINE ETAPE ===
 

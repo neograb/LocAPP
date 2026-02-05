@@ -10,13 +10,24 @@
             <h2 class="card-title">Mon Compte</h2>
         </div>
         <div class="account-info">
-            <div class="user-avatar">
-                <span>👤</span>
+            <div class="user-avatar-container">
+                <div class="user-avatar" id="userAvatarPreview">
+                    <img id="userAvatarImage" src="/static/images/default-avatar.svg" alt="Avatar">
+                    <div class="avatar-overlay" onclick="document.getElementById('userAvatarInput').click()">
+                        <span>📷</span>
+                    </div>
+                </div>
+                <div class="avatar-actions">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('userAvatarInput').click()">Changer</button>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="deleteUserAvatar()" id="deleteUserAvatarBtn" style="display: none;">Supprimer</button>
+                </div>
+                <input type="file" id="userAvatarInput" accept="image/*" style="display: none;" onchange="uploadUserAvatar(this.files[0])">
             </div>
             <div class="user-details">
                 <h3 id="userName">{{ current_user.email }}</h3>
                 <p class="user-email">{{ current_user.email }}</p>
                 <p class="user-since">Membre depuis le <span id="memberSince">-</span></p>
+                <button class="btn btn-danger btn-sm delete-account-btn" onclick="openDeleteAccountModal()">Supprimer mon compte</button>
             </div>
         </div>
     </div>
@@ -100,6 +111,7 @@
             <p class="loading-text">Chargement des propriétés...</p>
         </div>
     </div>
+
 </div>
 
 <!-- Modal Preview Mobile -->
@@ -114,6 +126,72 @@
                 <div class="preview-frame">
                     <iframe id="previewFrame" src="" frameborder="0"></iframe>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Change Plan Confirmation -->
+<div class="modal" id="changePlanModal">
+    <div class="modal-content modal-plan">
+        <div class="modal-header">
+            <h3>Changer d'abonnement</h3>
+            <button class="modal-close" onclick="closeChangePlanModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="plan-change-summary">
+                <div class="plan-change-from">
+                    <span class="plan-label">Plan actuel</span>
+                    <span class="plan-icon" id="currentPlanIcon">🎁</span>
+                    <span class="plan-name" id="currentPlanName">Découverte</span>
+                    <span class="plan-price-info" id="currentPlanPrice">Gratuit</span>
+                </div>
+                <div class="plan-change-arrow">→</div>
+                <div class="plan-change-to">
+                    <span class="plan-label">Nouveau plan</span>
+                    <span class="plan-icon" id="newPlanIcon">🏠</span>
+                    <span class="plan-name" id="newPlanName">Propriétaire</span>
+                    <span class="plan-price-info" id="newPlanPrice">9€/mois</span>
+                </div>
+            </div>
+            <div class="plan-change-info">
+                <p id="planChangeMessage"></p>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeChangePlanModal()">Annuler</button>
+                <button class="btn btn-primary" id="confirmChangePlanBtn" onclick="confirmChangePlan()">Confirmer le changement</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Delete Account -->
+<div class="modal" id="deleteAccountModal">
+    <div class="modal-content modal-danger">
+        <div class="modal-header">
+            <h3>⚠️ Supprimer mon compte</h3>
+            <button class="modal-close" onclick="closeDeleteAccountModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="delete-warning">
+                <div class="warning-icon">🗑️</div>
+                <h4>Êtes-vous absolument sûr ?</h4>
+                <p>Cette action est <strong>définitive et irréversible</strong>.</p>
+                <ul>
+                    <li>Toutes vos propriétés seront supprimées</li>
+                    <li>Toutes vos configurations seront perdues</li>
+                    <li>Votre abonnement sera annulé</li>
+                    <li>Vous ne pourrez pas récupérer vos données</li>
+                </ul>
+            </div>
+            <div class="confirm-input">
+                <label>Pour confirmer, tapez <strong>confirmer</strong> ci-dessous :</label>
+                <input type="text" id="deleteConfirmInput" class="form-control" placeholder="Tapez confirmer" autocomplete="off">
+                <p class="confirm-hint" id="confirmHint"></p>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeDeleteAccountModal()">Annuler</button>
+                <button class="btn btn-danger" id="confirmDeleteBtn" onclick="confirmDeleteAccount()" disabled>Supprimer définitivement</button>
             </div>
         </div>
     </div>
@@ -138,7 +216,16 @@
     padding: 1.5rem;
 }
 
+/* User Avatar Container */
+.user-avatar-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 .user-avatar {
+    position: relative;
     width: 80px;
     height: 80px;
     background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
@@ -147,6 +234,55 @@
     align-items: center;
     justify-content: center;
     font-size: 2.5rem;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.user-avatar .avatar-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.user-avatar:hover .avatar-overlay {
+    opacity: 1;
+}
+
+.user-avatar .avatar-overlay span {
+    font-size: 24px;
+}
+
+.avatar-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.85rem;
+}
+
+.btn-danger {
+    background: #e74c3c;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c0392b;
 }
 
 .user-details h3 {
@@ -163,6 +299,10 @@
     color: var(--text-muted);
     font-size: 0.85rem;
     margin: 0;
+}
+
+.delete-account-btn {
+    margin-top: 1rem;
 }
 
 /* Subscription */
@@ -461,6 +601,167 @@
     height: 100%;
 }
 
+/* Change Plan Modal */
+.modal-plan {
+    max-width: 500px;
+}
+
+.modal-plan .modal-header {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border-bottom: 1px solid #bfdbfe;
+}
+
+.modal-plan .modal-header h3 {
+    color: var(--primary-color);
+}
+
+.plan-change-summary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    padding: 1.5rem;
+    background: #f9fafb;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+}
+
+.plan-change-from,
+.plan-change-to {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 120px;
+}
+
+.plan-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.plan-icon {
+    font-size: 2rem;
+}
+
+.plan-name {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.plan-price-info {
+    font-size: 0.9rem;
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+.plan-change-arrow {
+    font-size: 1.5rem;
+    color: var(--text-muted);
+}
+
+.plan-change-info {
+    text-align: center;
+    padding: 1rem;
+    background: #fffbeb;
+    border-radius: 8px;
+    border: 1px solid #fde68a;
+}
+
+.plan-change-info p {
+    margin: 0;
+    color: #92400e;
+    font-size: 0.9rem;
+}
+
+/* Delete Account Modal */
+.modal-danger {
+    max-width: 500px;
+}
+
+.modal-danger .modal-header {
+    background: #fef2f2;
+    border-bottom: 1px solid #fee2e2;
+}
+
+.modal-danger .modal-header h3 {
+    color: #dc2626;
+}
+
+.delete-warning {
+    text-align: center;
+    padding: 1rem 0;
+}
+
+.delete-warning .warning-icon {
+    font-size: 48px;
+    margin-bottom: 1rem;
+}
+
+.delete-warning h4 {
+    color: #dc2626;
+    margin-bottom: 0.5rem;
+}
+
+.delete-warning p {
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+}
+
+.delete-warning ul {
+    text-align: left;
+    list-style: none;
+    padding: 0;
+    background: #fef2f2;
+    border-radius: 8px;
+    padding: 1rem 1.5rem;
+}
+
+.delete-warning ul li {
+    padding: 0.5rem 0;
+    color: #991b1b;
+    font-size: 0.9rem;
+}
+
+.delete-warning ul li::before {
+    content: "✗ ";
+    color: #dc2626;
+}
+
+.confirm-input {
+    margin: 1.5rem 0;
+}
+
+.confirm-input label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--text-color);
+}
+
+.confirm-input input {
+    width: 100%;
+}
+
+.confirm-hint {
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+    color: #dc2626;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.modal-actions .btn-danger:disabled {
+    background: #fca5a5;
+    cursor: not-allowed;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .account-info {
@@ -487,6 +788,10 @@
         flex-wrap: wrap;
         justify-content: center;
     }
+
+    .modal-actions {
+        flex-direction: column;
+    }
 }
 </style>
 {% endblock %}
@@ -503,6 +808,8 @@ const PLAN_LIMITS = {
 let currentSubscription = null;
 let userProperties = [];
 
+let currentUserAvatarPath = null;
+
 // Load user data
 async function loadUserData() {
     try {
@@ -512,9 +819,83 @@ async function loadUserData() {
             if (response.name) {
                 document.getElementById('userName').textContent = response.name;
             }
+
+            // Load avatar
+            if (response.avatar) {
+                currentUserAvatarPath = response.avatar;
+                const avatarUrl = `/static/uploads/photos/${response.avatar}`;
+                document.getElementById('userAvatarImage').src = avatarUrl;
+                document.getElementById('deleteUserAvatarBtn').style.display = 'block';
+            } else {
+                currentUserAvatarPath = null;
+                document.getElementById('userAvatarImage').src = '/static/images/default-avatar.svg';
+                document.getElementById('deleteUserAvatarBtn').style.display = 'none';
+            }
         }
     } catch (error) {
         console.error('Error loading user data:', error);
+    }
+}
+
+// Upload user avatar
+async function uploadUserAvatar(file) {
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+        showAlert('Le fichier doit être une image', 'error');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    try {
+        const response = await fetch('/api/account/avatar', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            currentUserAvatarPath = result.avatar;
+            const avatarUrl = `/static/uploads/photos/${result.avatar}`;
+            document.getElementById('userAvatarImage').src = avatarUrl;
+            document.getElementById('deleteUserAvatarBtn').style.display = 'block';
+            showAlert('Avatar mis à jour', 'success');
+        } else {
+            showAlert(`Erreur: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        showAlert('Erreur lors de l\'upload de l\'avatar', 'error');
+    }
+
+    // Reset file input
+    document.getElementById('userAvatarInput').value = '';
+}
+
+// Delete user avatar
+async function deleteUserAvatar() {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer votre avatar ?')) return;
+
+    try {
+        const response = await fetch('/api/account/avatar', {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            currentUserAvatarPath = null;
+            document.getElementById('userAvatarImage').src = '/static/images/default-avatar.svg';
+            document.getElementById('deleteUserAvatarBtn').style.display = 'none';
+            showAlert('Avatar supprimé', 'success');
+        } else {
+            showAlert(`Erreur: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        showAlert('Erreur lors de la suppression de l\'avatar', 'error');
     }
 }
 
@@ -530,9 +911,21 @@ async function loadSubscription() {
         badge.querySelector('.badge-icon').textContent = planConfig.icon;
         badge.querySelector('.badge-name').textContent = response.plan_name || 'Découverte';
 
-        document.getElementById('activationDate').textContent = formatDate(response.activated_at);
-        document.getElementById('subscriptionDuration').textContent = response.duration || '-';
-        document.getElementById('nextBilling').textContent = response.next_billing ? formatDate(response.next_billing) : 'N/A (gratuit)';
+        // Date d'activation
+        const activationDate = response.activated_at ? new Date(response.activated_at) : new Date();
+        document.getElementById('activationDate').textContent = formatDateOnly(activationDate);
+
+        // Durée et prochaine facturation selon le plan
+        if (response.plan === 'decouverte') {
+            document.getElementById('subscriptionDuration').textContent = 'Illimitée';
+            document.getElementById('nextBilling').textContent = 'N/A (gratuit)';
+        } else {
+            document.getElementById('subscriptionDuration').textContent = '1 mois (renouvellement automatique)';
+            // Prochaine facturation = date d'activation + 1 mois
+            const nextBillingDate = new Date(activationDate);
+            nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+            document.getElementById('nextBilling').textContent = formatDateOnly(nextBillingDate);
+        }
 
         // Update plan cards to show current plan
         updatePlanCards(response.plan);
@@ -543,6 +936,17 @@ async function loadSubscription() {
         currentSubscription = { plan: 'decouverte', plan_name: 'Découverte' };
         updatePlanCards('decouverte');
     }
+}
+
+// Format date without time (DD/MM/YYYY)
+function formatDateOnly(date) {
+    if (!date) return '-';
+    const d = new Date(date);
+    return d.toLocaleDateString('fr-FR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    });
 }
 
 // Update plan cards UI
@@ -688,37 +1092,87 @@ function closePreviewModal() {
     document.getElementById('previewFrame').src = '';
 }
 
-// Plan selection
+// Plan info for modal
+const PLAN_INFO = {
+    'decouverte': { name: 'Découverte', icon: '🎁', price: 'Gratuit' },
+    'proprietaire': { name: 'Propriétaire', icon: '🏠', price: '9€/mois' },
+    'gestionnaire': { name: 'Gestionnaire', icon: '🏢', price: '29€/mois' }
+};
+
+let pendingPlanChange = null;
+
+// Plan selection - open confirmation modal
 document.querySelectorAll('.btn-select-plan').forEach(btn => {
-    btn.addEventListener('click', async function() {
-        const plan = this.dataset.plan;
-        if (plan === currentSubscription?.plan) return;
+    btn.addEventListener('click', function() {
+        const newPlan = this.dataset.plan;
+        if (newPlan === currentSubscription?.plan) return;
 
-        if (!confirm(`Voulez-vous passer au plan "${plan.charAt(0).toUpperCase() + plan.slice(1)}" ?`)) {
-            return;
-        }
-
-        try {
-            const response = await fetch('/api/subscription', {
-                method: 'PUT',
-                headers: getAuthHeaders(),
-                body: JSON.stringify({ plan: plan })
-            });
-
-            const result = await response.json();
-
-            if (response.ok) {
-                showAlert('Abonnement mis à jour', 'success');
-                loadSubscription();
-                loadProperties();
-            } else {
-                showAlert(result.error || 'Erreur', 'error');
-            }
-        } catch (error) {
-            showAlert('Erreur de connexion', 'error');
-        }
+        openChangePlanModal(newPlan);
     });
 });
+
+// Open change plan modal
+function openChangePlanModal(newPlan) {
+    const currentPlan = currentSubscription?.plan || 'decouverte';
+    pendingPlanChange = newPlan;
+
+    const currentInfo = PLAN_INFO[currentPlan];
+    const newInfo = PLAN_INFO[newPlan];
+
+    // Update modal content
+    document.getElementById('currentPlanIcon').textContent = currentInfo.icon;
+    document.getElementById('currentPlanName').textContent = currentInfo.name;
+    document.getElementById('currentPlanPrice').textContent = currentInfo.price;
+
+    document.getElementById('newPlanIcon').textContent = newInfo.icon;
+    document.getElementById('newPlanName').textContent = newInfo.name;
+    document.getElementById('newPlanPrice').textContent = newInfo.price;
+
+    // Message selon le type de changement
+    let message = '';
+    if (newPlan === 'decouverte') {
+        message = 'Vous allez passer au plan gratuit. Vos propriétés excédentaires seront désactivées.';
+    } else if (currentPlan === 'decouverte') {
+        message = `Votre abonnement débutera immédiatement et sera renouvelé automatiquement chaque mois.`;
+    } else {
+        message = 'Votre nouvel abonnement prendra effet immédiatement.';
+    }
+    document.getElementById('planChangeMessage').textContent = message;
+
+    document.getElementById('changePlanModal').classList.add('show');
+}
+
+// Close change plan modal
+function closeChangePlanModal() {
+    document.getElementById('changePlanModal').classList.remove('show');
+    pendingPlanChange = null;
+}
+
+// Confirm plan change
+async function confirmChangePlan() {
+    if (!pendingPlanChange) return;
+
+    try {
+        const response = await fetch('/api/subscription', {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ plan: pendingPlanChange })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showAlert('Abonnement mis à jour', 'success');
+            closeChangePlanModal();
+            loadSubscription();
+            loadProperties();
+        } else {
+            showAlert(result.error || 'Erreur', 'error');
+        }
+    } catch (error) {
+        showAlert('Erreur de connexion', 'error');
+    }
+}
 
 // Modal close on outside click
 document.getElementById('previewModal').addEventListener('click', function(e) {
@@ -731,6 +1185,85 @@ document.getElementById('previewModal').addEventListener('click', function(e) {
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         closePreviewModal();
+        closeChangePlanModal();
+        closeDeleteAccountModal();
+    }
+});
+
+// Close change plan modal on outside click
+document.getElementById('changePlanModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeChangePlanModal();
+    }
+});
+
+// Delete Account Modal
+function openDeleteAccountModal() {
+    document.getElementById('deleteAccountModal').classList.add('show');
+    document.getElementById('deleteConfirmInput').value = '';
+    document.getElementById('confirmDeleteBtn').disabled = true;
+    document.getElementById('confirmHint').textContent = '';
+}
+
+function closeDeleteAccountModal() {
+    document.getElementById('deleteAccountModal').classList.remove('show');
+    document.getElementById('deleteConfirmInput').value = '';
+}
+
+// Validate confirmation input
+document.getElementById('deleteConfirmInput').addEventListener('input', function(e) {
+    const value = e.target.value.toLowerCase().trim();
+    const confirmBtn = document.getElementById('confirmDeleteBtn');
+    const hint = document.getElementById('confirmHint');
+
+    if (value === 'confirmer') {
+        confirmBtn.disabled = false;
+        hint.textContent = '✓ Vous pouvez maintenant supprimer votre compte';
+        hint.style.color = '#059669';
+    } else if (value.length > 0) {
+        confirmBtn.disabled = true;
+        hint.textContent = 'Tapez exactement "confirmer" pour continuer';
+        hint.style.color = '#dc2626';
+    } else {
+        confirmBtn.disabled = true;
+        hint.textContent = '';
+    }
+});
+
+// Confirm delete account
+async function confirmDeleteAccount() {
+    const confirmInput = document.getElementById('deleteConfirmInput').value.toLowerCase().trim();
+
+    if (confirmInput !== 'confirmer') {
+        showAlert('Veuillez taper "confirmer" pour valider', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/account', {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showAlert('Compte supprimé. Redirection...', 'success');
+            setTimeout(() => {
+                window.location.href = '/logout';
+            }, 2000);
+        } else {
+            showAlert(result.error || 'Erreur lors de la suppression', 'error');
+        }
+    } catch (error) {
+        showAlert('Erreur de connexion', 'error');
+    }
+}
+
+// Close modal on outside click
+document.getElementById('deleteAccountModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeDeleteAccountModal();
     }
 });
 
