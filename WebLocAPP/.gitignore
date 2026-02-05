@@ -38,14 +38,12 @@ Thumbs.db
 # Environment files (sensitive credentials)
 .env
 .env-*
-!.env-weblocapp
 *.env
 
 # Backups
 backups/
 
-# User uploads - photos not versioned
-static/uploads/photos/
+# User uploads - headers not versioned
 static/uploads/headers/
 
 # Data exports
