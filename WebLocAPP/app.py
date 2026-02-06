@@ -46,6 +46,10 @@ GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
 GOOGLE_MAPS_API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY', '')
 app.config['GOOGLE_MAPS_API_KEY'] = GOOGLE_MAPS_API_KEY
 
+# OpenAI API Configuration (for AI property generation)
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
+OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-4o-mini')
+
 # Initialize OAuth
 oauth = OAuth(app)
 
@@ -71,11 +75,11 @@ PASSWORD = 'admin'
 
 # Email configuration for notifications
 EMAIL_CONFIG = {
-    'smtp_server': 'smtp.gmail.com',
-    'smtp_port': 587,
-    'sender_email': 'myskyidentity@gmail.com',
-    'sender_password': '',  # Configure via SENDER_PASSWORD env var
-    'notification_email': 'abonard@gmail.com'
+    'smtp_server': os.environ.get('SMTP_SERVER', 'smtp.gmail.com'),
+    'smtp_port': int(os.environ.get('SMTP_PORT', 587)),
+    'sender_email': os.environ.get('SENDER_EMAIL', 'myskyidentity@gmail.com'),
+    'sender_password': os.environ.get('SENDER_PASSWORD', ''),
+    'notification_email': os.environ.get('NOTIFICATION_EMAIL', 'abonard@gmail.com')
 }
 
 # Session storage (sessions are temporary, users are in database)
@@ -127,6 +131,16 @@ def get_current_user():
         user_data = db.get_user_by_email(email)
         return User.from_db(user_data)
     return None
+
+def login_required(f):
+    """Decorator to require login for admin routes"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        current_user = get_current_user()
+        if not current_user:
+            return redirect(url_for('login') + '?error=session_expired')
+        return f(*args, **kwargs)
+    return decorated_function
 
 def create_session(email, request_obj=None):
     """Create a new session with detailed tracking"""
@@ -180,8 +194,8 @@ def hash_password(password):
 def send_notification_email(user):
     """Send notification email when a new user registers"""
     try:
-        subject = "Nouvel inscrit sur LocAPP"
-        body = f"Mr {user.lastname} {user.firstname} s'est inscrit avec l'adresse mail {user.email}"
+        subject = "Nouveau compte sur LocAPP"
+        body = f"Mr {user.lastname} {user.firstname} vient de créer un compte sur LocAPP."
 
         msg = MIMEMultipart()
         msg['From'] = EMAIL_CONFIG['sender_email']
@@ -189,18 +203,13 @@ def send_notification_email(user):
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'plain'))
 
-        # Note: In production, configure SMTP credentials
-        # For now, just log the email
-        print(f"[EMAIL NOTIFICATION] To: {EMAIL_CONFIG['notification_email']}")
-        print(f"[EMAIL NOTIFICATION] Subject: {subject}")
-        print(f"[EMAIL NOTIFICATION] Body: {body}")
+        # Send email via SMTP
+        with smtplib.SMTP(EMAIL_CONFIG['smtp_server'], EMAIL_CONFIG['smtp_port']) as server:
+            server.starttls()
+            server.login(EMAIL_CONFIG['sender_email'], EMAIL_CONFIG['sender_password'])
+            server.send_message(msg)
 
-        # Uncomment below to actually send email when SMTP is configured
-        # with smtplib.SMTP(EMAIL_CONFIG['smtp_server'], EMAIL_CONFIG['smtp_port']) as server:
-        #     server.starttls()
-        #     server.login(EMAIL_CONFIG['sender_email'], EMAIL_CONFIG['sender_password'])
-        #     server.send_message(msg)
-
+        print(f"[EMAIL NOTIFICATION] Email envoyé à {EMAIL_CONFIG['notification_email']}")
         return True
     except Exception as e:
         print(f"Error sending email: {e}")
@@ -227,8 +236,22 @@ def requires_user_auth(f):
     return decorated
 
 def get_property_id():
-    """Get property_id from query parameter, default to 1 (Mazet BSA)"""
-    return request.args.get('property_id', 1, type=int)
+    """Get property_id from query parameter, header, or default to 1 (Mazet BSA)"""
+    # First check query parameters
+    property_id = request.args.get('property_id', type=int)
+    if property_id:
+        return property_id
+
+    # Then check X-Property-ID header (used by AI regeneration endpoints)
+    header_id = request.headers.get('X-Property-ID')
+    if header_id:
+        try:
+            return int(header_id)
+        except (ValueError, TypeError):
+            pass
+
+    # Default fallback
+    return 1
 
 def user_owns_property(user, property_id):
     """Check if user owns the given property"""
@@ -308,17 +331,30 @@ def api_register():
     firstname = data.get('firstname', '').strip()
     lastname = data.get('lastname', '').strip()
 
-    # Validation
+    # Validation - tous les champs requis
     if not email or not password or not firstname or not lastname:
         return jsonify({'error': 'Tous les champs sont requis'}), 400
 
+    # Validation - format email
+    email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if not re.match(email_regex, email):
+        return jsonify({'error': 'Le format de l\'adresse email est invalide', 'field': 'email'}), 400
+
+    # Validation - longueur nom et prénom (minimum 2 caractères)
+    if len(firstname) < 2:
+        return jsonify({'error': 'Le prénom doit contenir au moins 2 caractères', 'field': 'firstname'}), 400
+
+    if len(lastname) < 2:
+        return jsonify({'error': 'Le nom doit contenir au moins 2 caractères', 'field': 'lastname'}), 400
+
+    # Validation - longueur mot de passe
     if len(password) < 8:
-        return jsonify({'error': 'Le mot de passe doit contenir au moins 8 caractères'}), 400
+        return jsonify({'error': 'Le mot de passe doit contenir au moins 8 caractères', 'field': 'password'}), 400
 
     # Check if user already exists in database
     existing_user = db.get_user_by_email(email)
     if existing_user:
-        return jsonify({'error': 'Cette adresse email est déjà utilisée'}), 400
+        return jsonify({'error': 'Un compte existe déjà avec cette adresse email', 'field': 'email', 'code': 'EMAIL_EXISTS'}), 400
 
     # Create user in database
     user_id = db.create_user({
@@ -393,6 +429,10 @@ def google_login():
             'error': 'Google OAuth non configuré. Définissez GOOGLE_CLIENT_ID et GOOGLE_CLIENT_SECRET.'
         }), 501
 
+    # Store action (login or register) in session
+    action = request.args.get('action', 'login')
+    session['google_oauth_action'] = action
+
     # Generate redirect URI
     redirect_uri = url_for('google_callback', _external=True)
     return google.authorize_redirect(redirect_uri)
@@ -404,6 +444,9 @@ def google_callback():
         return redirect(url_for('login'))
 
     try:
+        # Get the action from session (login or register)
+        action = session.pop('google_oauth_action', 'login')
+
         # Get the token from Google
         token = google.authorize_access_token()
 
@@ -426,7 +469,12 @@ def google_callback():
         user_data = db.get_user_by_email(email)
 
         if not user_data:
-            # Create new user in database (Google users don't have password)
+            # No existing account
+            if action == 'login':
+                # Trying to login but account doesn't exist
+                return redirect(url_for('login') + '?error=account_not_found')
+
+            # Register - create new user
             user_id = db.create_user({
                 'email': email,
                 'firstname': firstname or 'Utilisateur',
@@ -445,6 +493,17 @@ def google_callback():
             # Send notification email for new user
             send_notification_email(user)
         else:
+            # User exists
+            existing_google_id = user_data.get('google_id')
+
+            # If trying to REGISTER but account already exists
+            if action == 'register':
+                return redirect(url_for('login') + '?error=account_exists')
+
+            # Login - allow login and update google_id if needed
+            if not existing_google_id and google_id:
+                db.update_user_google_id(user_data['id'], google_id)
+
             user = User.from_db(user_data)
 
         # Create session token with tracking
@@ -596,13 +655,14 @@ L'équipe LocAPP
         print(f"[PASSWORD RESET EMAIL] Reset URL: {reset_url}")
 
         # Send email if SMTP is configured
-        smtp_password = os.environ.get('SENDER_PASSWORD', '')
-        if smtp_password:
+        if EMAIL_CONFIG['sender_password']:
             with smtplib.SMTP(EMAIL_CONFIG['smtp_server'], EMAIL_CONFIG['smtp_port']) as server:
                 server.starttls()
-                server.login(os.environ.get('SENDER_EMAIL', EMAIL_CONFIG['sender_email']), smtp_password)
+                server.login(EMAIL_CONFIG['sender_email'], EMAIL_CONFIG['sender_password'])
                 server.send_message(msg)
                 print(f"[PASSWORD RESET EMAIL] Email sent successfully to {user_data['email']}")
+        else:
+            print(f"[PASSWORD RESET EMAIL] SMTP not configured, email not sent")
 
         return True
     except Exception as e:
@@ -625,6 +685,7 @@ def home():
     return redirect(url_for('commercial_home'))
 
 @app.route('/admin')
+@login_required
 def admin_home():
     """Admin dashboard"""
     current_user = get_current_user()
@@ -632,6 +693,7 @@ def admin_home():
     return render_template('index.html', properties=properties, current_user=current_user)
 
 @app.route('/property/new')
+@login_required
 def new_property_page():
     """Page to create a new property"""
     current_user = get_current_user()
@@ -639,75 +701,95 @@ def new_property_page():
     return render_template('property_new.html', properties=properties, current_user=current_user, config=app.config)
 
 @app.route('/general')
+@login_required
 def general_page():
     current_user = get_current_user()
     properties = get_user_properties(current_user)
-    return render_template('general.html', properties=properties, current_user=current_user)
+    subscription = db.get_user_subscription(current_user.id) if current_user else None
+    has_ai_access = subscription and subscription.get('plan') != 'decouverte'
+    return render_template('general.html', properties=properties, current_user=current_user, has_ai_access=has_ai_access)
 
 @app.route('/wifi')
+@login_required
 def wifi_page():
     current_user = get_current_user()
     properties = get_user_properties(current_user)
     return render_template('wifi.html', properties=properties, current_user=current_user)
 
 @app.route('/address')
+@login_required
 def address_page():
     current_user = get_current_user()
     properties = get_user_properties(current_user)
-    return render_template('address.html', properties=properties, current_user=current_user)
+    subscription = db.get_user_subscription(current_user.id) if current_user else None
+    has_ai_access = subscription and subscription.get('plan') != 'decouverte'
+    return render_template('address.html', properties=properties, current_user=current_user, has_ai_access=has_ai_access)
 
 @app.route('/parking')
+@login_required
 def parking_page():
     current_user = get_current_user()
     properties = get_user_properties(current_user)
-    return render_template('parking.html', properties=properties, current_user=current_user)
+    subscription = db.get_user_subscription(current_user.id) if current_user else None
+    has_ai_access = subscription and subscription.get('plan') != 'decouverte'
+    return render_template('parking.html', properties=properties, current_user=current_user, has_ai_access=has_ai_access)
 
 @app.route('/access')
+@login_required
 def access_page():
     current_user = get_current_user()
     properties = get_user_properties(current_user)
     return render_template('access.html', properties=properties, current_user=current_user)
 
 @app.route('/contact')
+@login_required
 def contact_page():
     current_user = get_current_user()
     properties = get_user_properties(current_user)
     return render_template('contact.html', properties=properties, current_user=current_user)
 
 @app.route('/activities')
+@login_required
 def activities_page():
     current_user = get_current_user()
     properties = get_user_properties(current_user)
-    return render_template('activities.html', properties=properties, current_user=current_user)
+    subscription = db.get_user_subscription(current_user.id) if current_user else None
+    has_ai_access = subscription and subscription.get('plan') != 'decouverte'
+    return render_template('activities.html', properties=properties, current_user=current_user, has_ai_access=has_ai_access)
 
 @app.route('/services')
+@login_required
 def services_page():
     current_user = get_current_user()
     properties = get_user_properties(current_user)
-    return render_template('services.html', properties=properties, current_user=current_user)
+    subscription = db.get_user_subscription(current_user.id) if current_user else None
+    has_ai_access = subscription and subscription.get('plan') != 'decouverte'
+    return render_template('services.html', properties=properties, current_user=current_user, has_ai_access=has_ai_access)
 
 @app.route('/emergency')
+@login_required
 def emergency_page():
     current_user = get_current_user()
     properties = get_user_properties(current_user)
     return render_template('emergency.html', properties=properties, current_user=current_user)
 
 @app.route('/photos')
+@login_required
 def photos_page():
     current_user = get_current_user()
     properties = get_user_properties(current_user)
     return render_template('photos.html', properties=properties, current_user=current_user)
 
 @app.route('/account')
+@login_required
 def account_page():
     """Account management page"""
     current_user = get_current_user()
-    if not current_user:
-        return redirect(url_for('login'))
     properties = get_user_properties(current_user)
     return render_template('account.html', properties=properties, current_user=current_user)
 
 @app.route('/equipements')
+@login_required
 def equipements_page():
     current_user = get_current_user()
     properties = get_user_properties(current_user)
@@ -743,6 +825,14 @@ def create_property():
     current_user = get_current_user()
     if not current_user:
         return jsonify({'error': 'Vous devez être connecté pour créer une propriété'}), 401
+
+    # Check property limit based on subscription
+    if not db.can_add_property(current_user.id):
+        subscription = db.get_user_subscription(current_user.id)
+        max_props = subscription.get('max_properties', 1) if subscription else 1
+        return jsonify({
+            'error': f'Vous avez atteint la limite de {max_props} propriété(s) pour votre abonnement. Passez à un plan supérieur pour créer plus de propriétés.'
+        }), 403
 
     data = request.json
     name = data.get('name', '').strip()
@@ -797,6 +887,482 @@ def create_property():
         'slug': slug,
         'message': message
     })
+
+@app.route('/api/properties/generate-ai', methods=['POST'])
+def generate_property_with_ai():
+    """Generate property content using AI based on address"""
+    from ai_service import AIService
+
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Vous devez être connecté'}), 401
+
+    # Check property limit based on subscription
+    if not db.can_add_property(current_user.id):
+        subscription = db.get_user_subscription(current_user.id)
+        max_props = subscription.get('max_properties', 1) if subscription else 1
+        return jsonify({
+            'error': f'Vous avez atteint la limite de {max_props} propriété(s) pour votre abonnement. Passez à un plan supérieur pour créer plus de propriétés.'
+        }), 403
+
+    # Check if OpenAI is configured
+    if not os.environ.get('OPENAI_API_KEY'):
+        return jsonify({'error': 'La génération IA n\'est pas configurée. Contactez l\'administrateur.'}), 503
+
+    data = request.json
+    property_name = data.get('name', '').strip()
+    address = data.get('address', '').strip()
+    latitude = data.get('latitude')
+    longitude = data.get('longitude')
+    display_name = data.get('display_name', '').strip()
+    region = data.get('region', '').strip()
+
+    if not property_name:
+        return jsonify({'error': 'Le nom de la propriété est requis'}), 400
+
+    if not address or not latitude or not longitude:
+        return jsonify({'error': 'L\'adresse et les coordonnées sont requises'}), 400
+
+    try:
+        ai_service = AIService()
+
+        # Extract city from address
+        address_parts = address.split(',')
+        city = ''
+        for part in address_parts:
+            part = part.strip()
+            # Skip parts that are mainly numbers (postal codes, street numbers)
+            if part and not part[0].isdigit():
+                city = part
+                break
+        if not city:
+            city = region
+
+        print(f"[AI Generate] Starting generation for: {address}")
+        print(f"[AI Generate] City: {city}, Region: {region}")
+
+        # 1. Generate property description
+        print("[AI Generate] Generating property description...")
+        description = ai_service.generate_property_description(address, city, region)
+        print(f"[AI Generate] Description generated: {description[:50]}...")
+
+        # 2. Find nearby services (Pharmacy, Supermarket, Bakery)
+        print("[AI Generate] Finding nearby services...")
+        service_types = [
+            ('pharmacy', 'Pharmacie', '💊'),
+            ('supermarket', 'Supermarché', '🛒'),
+            ('bakery', 'Boulangerie', '🥖')
+        ]
+        services = ai_service.find_nearby_places(
+            float(latitude),
+            float(longitude),
+            service_types
+        )
+        print(f"[AI Generate] Found {len(services)} services")
+
+        # 3. Find nearest parking
+        print("[AI Generate] Finding nearest parking...")
+        parking_info = ai_service.find_nearest_parking(
+            float(latitude),
+            float(longitude),
+            city,
+            region
+        )
+        if parking_info:
+            print(f"[AI Generate] Parking found: {parking_info.get('distance')}")
+
+        # 4. Generate activities based on the property address
+        print("[AI Generate] Generating activities...")
+        full_address = display_name or address
+        activities_data = ai_service.generate_activities(full_address, city, region, float(latitude), float(longitude))
+        print(f"[AI Generate] Activities generated")
+
+        # 5. Generate welcome message
+        print("[AI Generate] Generating welcome message...")
+        welcome_data = ai_service.generate_welcome_message(property_name, full_address, city, region)
+        print(f"[AI Generate] Welcome message generated")
+
+        # 6. Generate slug from user-provided name
+        slug = re.sub(r'[^a-z0-9]+', '-', property_name.lower()).strip('-')
+
+        # Ensure slug is unique
+        existing = db.get_property_by_slug(slug)
+        if existing:
+            import time
+            slug = f"{slug}-{int(time.time())}"
+
+        # 6. Create property in database
+        print("[AI Generate] Creating property in database...")
+        template_id = db.get_template_property_id()
+
+        if template_id:
+            property_id = db.duplicate_property_from_template(
+                template_property_id=template_id,
+                new_property_data={
+                    'name': property_name,
+                    'slug': slug,
+                    'icon': '🏠',
+                    'address': display_name or address,
+                    'latitude': latitude,
+                    'longitude': longitude,
+                    'region': region
+                },
+                user_id=current_user.id
+            )
+        else:
+            property_id = db.create_property({
+                'name': property_name,
+                'slug': slug,
+                'icon': '🏠',
+                'address': display_name or address,
+                'latitude': latitude,
+                'longitude': longitude,
+                'region': region
+            }, user_id=current_user.id)
+
+        # 8. Update address description with AI-generated content
+        print("[AI Generate] Updating address description...")
+        db.update_address_description(property_id, description)
+
+        # 9. Update welcome message with AI-generated content
+        print("[AI Generate] Updating welcome message...")
+        db.update_general_info(property_id, {
+            'property_name': property_name,
+            'welcome_title': welcome_data.get('welcome_title', f"Bienvenue à {property_name} !"),
+            'welcome_message': welcome_data.get('welcome_message', ''),
+            'welcome_description': welcome_data.get('welcome_description', '')
+        })
+
+        # 11. Delete template services and add AI-generated ones
+        print("[AI Generate] Removing template services...")
+        db.delete_all_nearby_services(property_id)
+
+        print("[AI Generate] Adding AI-generated services...")
+        for service in services:
+            db.create_nearby_service(property_id, service)
+
+        # 12. Update parking info
+        if parking_info:
+            print("[AI Generate] Updating parking info...")
+            db.update_parking_info(property_id, parking_info)
+
+        # 13. Delete template activities and create AI-generated ones
+        print("[AI Generate] Removing template activities...")
+        db.delete_all_activities(property_id)
+
+        print("[AI Generate] Creating AI-generated activities...")
+        activities_created = 0
+
+        # Category mapping: key in activities_data -> (category_name, icon)
+        category_mapping = {
+            'incontournables': ('Incontournables', '⭐'),
+            'sports': ('Sport', '🏃'),
+            'restaurants': ('Restaurant', '🍽️'),
+            'visites': ('Visite', '🗺️')
+        }
+
+        for key, (cat_name, cat_icon) in category_mapping.items():
+            if key in activities_data and activities_data[key]:
+                # Create category
+                category_id = db.create_activity_category(property_id, {
+                    'name': cat_name,
+                    'icon': cat_icon
+                })
+                print(f"[AI Generate] Created category: {cat_name}")
+
+                # Create activities for this category
+                for idx, activity in enumerate(activities_data[key]):
+                    db.create_activity(property_id, {
+                        'name': activity.get('name', 'Sans nom'),
+                        'category': cat_name,
+                        'description': activity.get('description', ''),
+                        'emoji': activity.get('emoji', '📍'),
+                        'distance': '',
+                        'display_order': idx
+                    })
+                    activities_created += 1
+
+        print(f"[AI Generate] Created {activities_created} activities")
+
+        print(f"[AI Generate] Property created successfully with ID: {property_id}")
+
+        return jsonify({
+            'success': True,
+            'id': property_id,
+            'slug': slug,
+            'message': 'Propriété générée avec succès par l\'IA',
+            'generated': {
+                'description': description,
+                'services_count': len(services),
+                'has_parking': parking_info is not None,
+                'activities_count': activities_created
+            }
+        })
+
+    except ValueError as e:
+        print(f"[AI Generate] Value error: {e}")
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        print(f"[AI Generate] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Erreur lors de la génération IA. Veuillez réessayer.'}), 500
+
+# ==================== AI Regeneration Endpoints ====================
+
+def check_ai_access(current_user):
+    """Check if user has AI access (paid plan)"""
+    if not current_user:
+        return False
+    subscription = db.get_user_subscription(current_user.id)
+    return subscription and subscription.get('plan') != 'decouverte'
+
+def get_property_address_info(property_id):
+    """Get address info for a property"""
+    address_data = db.get_address(property_id)
+    if not address_data:
+        return None, None, None, None, None
+
+    city = address_data.get('city', '')
+    street = address_data.get('street', '')
+    postal_code = address_data.get('postal_code', '')
+    full_address = f"{street}, {postal_code} {city}".strip(', ')
+    latitude = address_data.get('latitude')
+    longitude = address_data.get('longitude')
+
+    # Get region from property
+    conn = db.get_connection()
+    prop = conn.execute('SELECT region FROM properties WHERE id=?', (property_id,)).fetchone()
+    conn.close()
+    region = prop['region'] if prop else ''
+
+    return full_address, city, region, latitude, longitude
+
+@app.route('/api/ai/regenerate/general', methods=['POST'])
+@requires_auth
+def ai_regenerate_general():
+    """Regenerate welcome message with AI"""
+    from ai_service import AIService
+
+    current_user = get_current_user()
+    if not check_ai_access(current_user):
+        return jsonify({'error': 'Fonctionnalité réservée aux abonnés'}), 403
+
+    property_id = get_verified_property_id()
+    if not property_id:
+        return jsonify({'error': 'Propriété non trouvée'}), 404
+
+    try:
+        ai_service = AIService()
+
+        # Get property info
+        general_info = db.get_general_info(property_id)
+        property_name = general_info.get('property_name', 'Ma propriété')
+
+        full_address, city, region, _, _ = get_property_address_info(property_id)
+        if not city:
+            city = region or 'France'
+
+        # Generate welcome message
+        welcome_data = ai_service.generate_welcome_message(property_name, full_address or '', city, region or '')
+
+        # Update general info
+        db.update_general_info(property_id, {
+            'property_name': property_name,
+            'welcome_title': welcome_data.get('welcome_title', f"Bienvenue à {property_name} !"),
+            'welcome_message': welcome_data.get('welcome_message', ''),
+            'welcome_description': welcome_data.get('welcome_description', '')
+        })
+
+        return jsonify({
+            'success': True,
+            'data': welcome_data,
+            'message': 'Message de bienvenue régénéré avec succès'
+        })
+    except Exception as e:
+        print(f"[AI Regenerate General] Error: {e}")
+        return jsonify({'error': 'Erreur lors de la régénération'}), 500
+
+@app.route('/api/ai/regenerate/address', methods=['POST'])
+@requires_auth
+def ai_regenerate_address():
+    """Regenerate address description with AI"""
+    from ai_service import AIService
+
+    current_user = get_current_user()
+    if not check_ai_access(current_user):
+        return jsonify({'error': 'Fonctionnalité réservée aux abonnés'}), 403
+
+    property_id = get_verified_property_id()
+    if not property_id:
+        return jsonify({'error': 'Propriété non trouvée'}), 404
+
+    try:
+        ai_service = AIService()
+
+        full_address, city, region, _, _ = get_property_address_info(property_id)
+        if not full_address:
+            return jsonify({'error': 'Adresse non configurée'}), 400
+
+        # Generate description
+        description = ai_service.generate_property_description(full_address, city, region or '')
+
+        # Update address description
+        db.update_address_description(property_id, description)
+
+        return jsonify({
+            'success': True,
+            'description': description,
+            'message': 'Description régénérée avec succès'
+        })
+    except Exception as e:
+        print(f"[AI Regenerate Address] Error: {e}")
+        return jsonify({'error': 'Erreur lors de la régénération'}), 500
+
+@app.route('/api/ai/regenerate/activities', methods=['POST'])
+@requires_auth
+def ai_regenerate_activities():
+    """Regenerate activities with AI"""
+    from ai_service import AIService
+
+    current_user = get_current_user()
+    if not check_ai_access(current_user):
+        return jsonify({'error': 'Fonctionnalité réservée aux abonnés'}), 403
+
+    property_id = get_verified_property_id()
+    if not property_id:
+        return jsonify({'error': 'Propriété non trouvée'}), 404
+
+    try:
+        ai_service = AIService()
+
+        full_address, city, region, latitude, longitude = get_property_address_info(property_id)
+        if not latitude or not longitude:
+            return jsonify({'error': 'Coordonnées GPS non configurées'}), 400
+
+        # Generate activities
+        activities_data = ai_service.generate_activities(
+            full_address or '', city or '', region or '',
+            float(latitude), float(longitude)
+        )
+
+        # Delete existing activities and categories
+        db.delete_all_activities(property_id)
+
+        # Create new activities
+        activities_created = 0
+        category_mapping = {
+            'incontournables': ('Incontournables', '⭐'),
+            'sports': ('Sport', '🏃'),
+            'restaurants': ('Restaurant', '🍽️'),
+            'visites': ('Visite', '🗺️')
+        }
+
+        for key, (cat_name, cat_icon) in category_mapping.items():
+            if key in activities_data and activities_data[key]:
+                db.create_activity_category(property_id, {'name': cat_name, 'icon': cat_icon})
+                for idx, activity in enumerate(activities_data[key]):
+                    db.create_activity(property_id, {
+                        'name': activity.get('name', 'Sans nom'),
+                        'category': cat_name,
+                        'description': activity.get('description', ''),
+                        'emoji': activity.get('emoji', '📍'),
+                        'distance': '',
+                        'display_order': idx
+                    })
+                    activities_created += 1
+
+        return jsonify({
+            'success': True,
+            'activities_count': activities_created,
+            'message': f'{activities_created} activités régénérées avec succès'
+        })
+    except Exception as e:
+        print(f"[AI Regenerate Activities] Error: {e}")
+        return jsonify({'error': 'Erreur lors de la régénération'}), 500
+
+@app.route('/api/ai/regenerate/services', methods=['POST'])
+@requires_auth
+def ai_regenerate_services():
+    """Regenerate nearby services with AI"""
+    from ai_service import AIService
+
+    current_user = get_current_user()
+    if not check_ai_access(current_user):
+        return jsonify({'error': 'Fonctionnalité réservée aux abonnés'}), 403
+
+    property_id = get_verified_property_id()
+    if not property_id:
+        return jsonify({'error': 'Propriété non trouvée'}), 404
+
+    try:
+        ai_service = AIService()
+
+        _, _, _, latitude, longitude = get_property_address_info(property_id)
+        if not latitude or not longitude:
+            return jsonify({'error': 'Coordonnées GPS non configurées'}), 400
+
+        # Find nearby services
+        service_types = [
+            ('pharmacy', 'Pharmacie', '💊'),
+            ('supermarket', 'Supermarché', '🛒'),
+            ('bakery', 'Boulangerie', '🥖')
+        ]
+        services = ai_service.find_nearby_places(float(latitude), float(longitude), service_types)
+
+        # Delete existing services and add new ones
+        db.delete_all_nearby_services(property_id)
+        for service in services:
+            db.create_nearby_service(property_id, service)
+
+        return jsonify({
+            'success': True,
+            'services_count': len(services),
+            'message': f'{len(services)} services régénérés avec succès'
+        })
+    except Exception as e:
+        print(f"[AI Regenerate Services] Error: {e}")
+        return jsonify({'error': 'Erreur lors de la régénération'}), 500
+
+@app.route('/api/ai/regenerate/parking', methods=['POST'])
+@requires_auth
+def ai_regenerate_parking():
+    """Regenerate parking info with AI"""
+    from ai_service import AIService
+
+    current_user = get_current_user()
+    if not check_ai_access(current_user):
+        return jsonify({'error': 'Fonctionnalité réservée aux abonnés'}), 403
+
+    property_id = get_verified_property_id()
+    if not property_id:
+        return jsonify({'error': 'Propriété non trouvée'}), 404
+
+    try:
+        ai_service = AIService()
+
+        full_address, city, region, latitude, longitude = get_property_address_info(property_id)
+        if not latitude or not longitude:
+            return jsonify({'error': 'Coordonnées GPS non configurées'}), 400
+
+        # Find nearest parking
+        parking_info = ai_service.find_nearest_parking(
+            float(latitude), float(longitude),
+            city or '', region or ''
+        )
+
+        if parking_info:
+            db.update_parking_info(property_id, parking_info)
+            return jsonify({
+                'success': True,
+                'parking': parking_info,
+                'message': 'Informations parking régénérées avec succès'
+            })
+        else:
+            return jsonify({'error': 'Aucun parking trouvé à proximité'}), 404
+    except Exception as e:
+        print(f"[AI Regenerate Parking] Error: {e}")
+        return jsonify({'error': 'Erreur lors de la régénération'}), 500
 
 # API Routes - General Info
 @app.route('/api/general', methods=['GET'])
@@ -1641,6 +2207,26 @@ def update_subscription():
         return jsonify({'message': 'Abonnement mis à jour avec succès'})
     return jsonify({'error': 'Plan invalide'}), 400
 
+@app.route('/api/subscription/can-create-property', methods=['GET'])
+@requires_auth
+def can_create_property():
+    """Check if user can create more properties based on subscription"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Non authentifié'}), 401
+
+    can_create = db.can_add_property(current_user.id)
+    subscription = db.get_user_subscription(current_user.id)
+    current_count = db.count_user_properties(current_user.id)
+    max_props = subscription.get('max_properties', 1) if subscription else 1
+
+    return jsonify({
+        'can_create': can_create,
+        'current_count': current_count,
+        'max_properties': max_props,
+        'plan': subscription.get('plan', 'decouverte') if subscription else 'decouverte'
+    })
+
 @app.route('/api/account/properties', methods=['GET'])
 @requires_auth
 def get_account_properties():
@@ -1998,6 +2584,12 @@ GOOGLE_CLIENT_SECRET={GOOGLE_CLIENT_SECRET}
 # Enable: Maps JavaScript API, Places API
 GOOGLE_MAPS_API_KEY={GOOGLE_MAPS_API_KEY}
 
+# OpenAI API Configuration (for AI property generation)
+# Get your API key from: https://platform.openai.com/api-keys
+# Models: gpt-4o-mini (fast & cheap), gpt-4o (powerful), gpt-4-turbo (large context)
+OPENAI_API_KEY={OPENAI_API_KEY}
+OPENAI_MODEL={OPENAI_MODEL}
+
 # Email Configuration (for password reset and notifications)
 # For Gmail: You MUST use an App Password, not your regular password
 # 1. Go to https://myaccount.google.com/security
@@ -2020,6 +2612,28 @@ NOTIFICATION_EMAIL={NOTIFICATION_EMAIL}
             os.environ[key] = value
 
         return jsonify({'success': True, 'message': 'Configuration sauvegardée'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/superadmin/api/test-openai', methods=['POST'])
+@requires_superadmin
+def superadmin_test_openai():
+    """Test OpenAI API connection"""
+    api_key = os.environ.get('OPENAI_API_KEY', '')
+    if not api_key:
+        return jsonify({'error': 'Clé API OpenAI non configurée'}), 400
+
+    try:
+        import openai
+        client = openai.OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model=os.environ.get('OPENAI_MODEL', 'gpt-4o-mini'),
+            messages=[{"role": "user", "content": "Say 'OK'"}],
+            max_tokens=10
+        )
+        return jsonify({'success': True, 'message': 'Connexion réussie'})
+    except ImportError:
+        return jsonify({'error': 'Module openai non installé. Exécutez: pip install openai'}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

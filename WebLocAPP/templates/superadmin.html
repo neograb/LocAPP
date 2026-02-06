@@ -457,6 +457,31 @@
                         </div>
                     </div>
 
+                    <!-- OpenAI / ChatGPT -->
+                    <div style="border-top: 1px solid #0f3460; padding-top: 1rem; margin-top: 0.5rem;">
+                        <h4 style="color: #a855f7; margin-bottom: 1rem;">🤖 OpenAI / ChatGPT</h4>
+                        <div class="env-field">
+                            <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">OPENAI_API_KEY</label>
+                            <input type="password" id="env_openai_api_key" class="env-input" placeholder="sk-...">
+                            <small style="color: #888; display: block; margin-top: 0.25rem;">Clé API OpenAI pour la génération de contenu IA</small>
+                        </div>
+                        <div class="env-field" style="margin-top: 1rem;">
+                            <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">OPENAI_MODEL</label>
+                            <select id="env_openai_model" class="env-input">
+                                <option value="gpt-4o-mini">gpt-4o-mini (Rapide & Économique)</option>
+                                <option value="gpt-4o">gpt-4o (Plus puissant)</option>
+                                <option value="gpt-4-turbo">gpt-4-turbo (Contexte large)</option>
+                            </select>
+                            <small style="color: #888; display: block; margin-top: 0.25rem;">Modèle OpenAI à utiliser pour la génération</small>
+                        </div>
+                        <div style="margin-top: 1rem;">
+                            <button type="button" class="btn btn-secondary" onclick="testOpenAIConnection()" style="background: #a855f7;">
+                                🧪 Tester la connexion
+                            </button>
+                            <span id="openai-test-result" style="margin-left: 1rem;"></span>
+                        </div>
+                    </div>
+
                     <!-- Email SMTP -->
                     <div style="border-top: 1px solid #0f3460; padding-top: 1rem; margin-top: 0.5rem;">
                         <h4 style="color: #f59e0b; margin-bottom: 1rem;">📧 Configuration Email (SMTP)</h4>
@@ -678,6 +703,11 @@
                 const result = await response.json();
                 if (response.ok) {
                     showAlert('Propriété supprimée', 'success');
+                    // Clear localStorage if this was the current property
+                    const savedProperty = localStorage.getItem('locapp_current_property');
+                    if (savedProperty == propId) {
+                        localStorage.removeItem('locapp_current_property');
+                    }
                     setTimeout(() => window.location.reload(), 1000);
                 } else {
                     showAlert(result.error || 'Erreur', 'error');
@@ -837,6 +867,8 @@
                     document.getElementById('env_google_client_id').value = result.GOOGLE_CLIENT_ID || '';
                     document.getElementById('env_google_client_secret').value = result.GOOGLE_CLIENT_SECRET || '';
                     document.getElementById('env_google_maps_api_key').value = result.GOOGLE_MAPS_API_KEY || '';
+                    document.getElementById('env_openai_api_key').value = result.OPENAI_API_KEY || '';
+                    document.getElementById('env_openai_model').value = result.OPENAI_MODEL || 'gpt-4o-mini';
                     document.getElementById('env_smtp_server').value = result.SMTP_SERVER || '';
                     document.getElementById('env_smtp_port').value = result.SMTP_PORT || '';
                     document.getElementById('env_sender_email').value = result.SENDER_EMAIL || '';
@@ -858,6 +890,8 @@
                 GOOGLE_CLIENT_ID: document.getElementById('env_google_client_id').value,
                 GOOGLE_CLIENT_SECRET: document.getElementById('env_google_client_secret').value,
                 GOOGLE_MAPS_API_KEY: document.getElementById('env_google_maps_api_key').value,
+                OPENAI_API_KEY: document.getElementById('env_openai_api_key').value,
+                OPENAI_MODEL: document.getElementById('env_openai_model').value,
                 SMTP_SERVER: document.getElementById('env_smtp_server').value,
                 SMTP_PORT: document.getElementById('env_smtp_port').value,
                 SENDER_EMAIL: document.getElementById('env_sender_email').value,
@@ -886,6 +920,27 @@
 
         // Load ENV config on page load
         loadEnvConfig();
+
+        // Test OpenAI Connection
+        async function testOpenAIConnection() {
+            const resultSpan = document.getElementById('openai-test-result');
+            resultSpan.innerHTML = '<span style="color: #f59e0b;">Test en cours...</span>';
+
+            try {
+                const response = await fetch('/superadmin/api/test-openai', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (response.ok) {
+                    resultSpan.innerHTML = '<span style="color: #10b981;">✓ Connexion réussie!</span>';
+                } else {
+                    resultSpan.innerHTML = `<span style="color: #e94560;">✗ ${result.error}</span>`;
+                }
+            } catch (error) {
+                resultSpan.innerHTML = '<span style="color: #e94560;">✗ Erreur de connexion</span>';
+            }
+        }
 
         // ============================================
         // Photo Limits Management

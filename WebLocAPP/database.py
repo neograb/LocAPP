@@ -1201,6 +1201,18 @@ class Database:
         conn.commit()
         conn.close()
 
+    def update_address_description(self, property_id, description):
+        """Update only the description field of an address (used by AI generation)"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE address
+            SET description=?, updated_at=CURRENT_TIMESTAMP
+            WHERE property_id=?
+        ''', (description, property_id))
+        conn.commit()
+        conn.close()
+
     # ==================== Parking ====================
 
     def get_parking_info(self, property_id=1):
@@ -1314,6 +1326,15 @@ class Database:
         conn.commit()
         conn.close()
 
+    def delete_all_activities(self, property_id):
+        """Delete all activities and activity categories for a property (used before AI generation)"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM activities WHERE property_id=?', (property_id,))
+        cursor.execute('DELETE FROM activity_categories WHERE property_id=?', (property_id,))
+        conn.commit()
+        conn.close()
+
     # ==================== Emergency ====================
 
     def get_all_emergency_numbers(self, property_id=1):
@@ -1363,6 +1384,14 @@ class Database:
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute('DELETE FROM nearby_services WHERE id=?', (service_id,))
+        conn.commit()
+        conn.close()
+
+    def delete_all_nearby_services(self, property_id):
+        """Delete all nearby services for a property (used before AI generation)"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM nearby_services WHERE property_id=?', (property_id,))
         conn.commit()
         conn.close()
 
@@ -1564,6 +1593,18 @@ class Database:
                 SET password_hash=?, updated_at=CURRENT_TIMESTAMP
                 WHERE id=?
             ''', (password_hash, user_id))
+        conn.commit()
+        conn.close()
+
+    def update_user_google_id(self, user_id, google_id):
+        """Update user's Google ID"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE users
+            SET google_id=?, updated_at=CURRENT_TIMESTAMP
+            WHERE id=?
+        ''', (google_id, user_id))
         conn.commit()
         conn.close()
 

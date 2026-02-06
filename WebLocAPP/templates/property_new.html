@@ -153,6 +153,18 @@
         <h2 class="card-title">Créer une nouvelle propriété</h2>
     </div>
 
+    <!-- Limit Warning Banner -->
+    <div id="limitWarning" class="limit-warning" style="display: none;">
+        <div class="warning-content">
+            <span class="warning-icon">⚠️</span>
+            <div class="warning-text">
+                <strong>Limite atteinte</strong>
+                <p id="limitMessage">Vous avez atteint la limite de propriétés pour votre abonnement.</p>
+            </div>
+            <a href="/account" class="btn btn-primary btn-sm">Changer de plan</a>
+        </div>
+    </div>
+
     <form id="newPropertyForm">
         <div class="form-group">
             <label class="form-label" for="property_name">Nom de la propriété *</label>
@@ -196,6 +208,7 @@
             <select class="form-control" id="property_icon" name="icon">
                 <option value="🏠">🏠 Maison</option>
                 <option value="🏡">🏡 Maison avec jardin</option>
+                <option value="🏬">🏬 Appartement</option>
                 <option value="🏢">🏢 Immeuble</option>
                 <option value="🏨">🏨 Hôtel</option>
                 <option value="🏖️">🏖️ Bord de mer</option>
@@ -288,6 +301,55 @@
     margin-top: 0.5rem;
     font-size: 0.85rem;
     color: #6b7280;
+}
+
+.limit-warning {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border: 1px solid #f59e0b;
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.limit-warning .warning-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.limit-warning .warning-icon {
+    font-size: 2rem;
+}
+
+.limit-warning .warning-text {
+    flex: 1;
+    min-width: 200px;
+}
+
+.limit-warning .warning-text strong {
+    color: #92400e;
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.limit-warning .warning-text p {
+    margin: 0;
+    color: #78350f;
+    font-size: 0.9rem;
+}
+
+.limit-warning.limit-reached {
+    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+    border-color: #ef4444;
+}
+
+.limit-warning.limit-reached .warning-text strong {
+    color: #991b1b;
+}
+
+.limit-warning.limit-reached .warning-text p {
+    color: #7f1d1d;
 }
 </style>
 {% endblock %}
@@ -563,11 +625,17 @@ document.getElementById('newPropertyForm').addEventListener('submit', async (e) 
 
 // AI Generation
 async function generateWithAI() {
+    const name = document.getElementById('property_name').value.trim();
     const address = addressInput.value.trim();
     const lat = document.getElementById('property_lat').value;
     const lng = document.getElementById('property_lng').value;
     const displayName = document.getElementById('property_display_name').value;
     const region = document.getElementById('property_region').value;
+
+    if (!name) {
+        showAlert('Veuillez saisir un nom pour la propriété', 'error');
+        return;
+    }
 
     if (!address || !lat || !lng) {
         showAlert('Veuillez d\'abord valider une adresse', 'error');
@@ -583,7 +651,7 @@ async function generateWithAI() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                address, latitude: lat, longitude: lng,
+                name, address, latitude: lat, longitude: lng,
                 display_name: displayName, region: region
             })
         });
@@ -606,7 +674,45 @@ async function generateWithAI() {
     }
 }
 
+// Check property creation limit
+async function checkPropertyLimit() {
+    try {
+        const response = await fetch('/api/subscription/can-create-property', {
+            credentials: 'same-origin'
+        });
+
+        if (!response.ok) {
+            console.error('Error checking property limit: HTTP ' + response.status);
+            return;
+        }
+
+        const data = await response.json();
+
+        if (!data.can_create) {
+            const warningDiv = document.getElementById('limitWarning');
+            const messageP = document.getElementById('limitMessage');
+            const form = document.getElementById('newPropertyForm');
+
+            warningDiv.style.display = 'block';
+            warningDiv.classList.add('limit-reached');
+
+            const maxText = data.max_properties === -1 ? 'illimitées' : data.max_properties;
+            messageP.textContent = `Vous avez ${data.current_count}/${maxText} propriété(s). Passez à un plan supérieur pour en créer davantage.`;
+
+            // Disable the form
+            form.querySelectorAll('input, select, textarea').forEach(el => el.disabled = true);
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('aiBtn').disabled = true;
+        }
+    } catch (error) {
+        console.error('Error checking property limit:', error);
+    }
+}
+
 // Load the appropriate map API
 loadGoogleMapsAPI();
+
+// Check property limit on page load
+checkPropertyLimit();
 </script>
 {% endblock %}

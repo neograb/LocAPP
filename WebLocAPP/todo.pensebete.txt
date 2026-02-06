@@ -4,6 +4,20 @@
 - rediriger vers la page de connexion si les identifiants sont perdus lors du refresh d'une page admin
 - verifier qr code et plan dans rendu
 
+=== GENERATION IA PAR SECTION ===
+
+Ajouter un bouton "Générer avec l'IA" dans chaque section du menu de gauche :
+- Général (message de bienvenue)
+- Adresse (description du quartier)
+- Activités (incontournables, sports, restaurants, visites)
+- Services (pharmacie, supermarché, boulangerie)
+- Parking (informations parking)
+
+Conditions :
+- Le bouton n'est ACTIF que si le compte n'est PAS un compte gratuit (plan payant requis)
+- Pour les comptes gratuits : bouton grisé avec tooltip "Fonctionnalité réservée aux abonnés"
+- Régénère uniquement le contenu de la section concernée (pas toute la propriété)
+
 === PROCHAINE ETAPE ===
 
 Continuer la gestion de la création d'une nouvelle propriété :

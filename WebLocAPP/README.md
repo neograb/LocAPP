@@ -48,7 +48,7 @@ La base de données sera automatiquement créée au premier lancement avec les d
 python app.py
 ```
 
-Le serveur sera accessible sur : http://localhost:5000
+Le serveur sera accessible sur : http://localhost:5001
 
 ## Configuration
 
@@ -77,7 +77,7 @@ app.config['SECRET_KEY'] = 'votre-cle-secrete-unique'
 
 ### Interface Web
 
-1. Accédez à http://localhost:5000 dans votre navigateur
+1. Accédez à http://localhost:5001 dans votre navigateur
 2. Naviguez entre les différentes sections via le menu
 3. Modifiez les champs souhaités
 4. Cliquez sur "Enregistrer" (authentification requise)
@@ -155,7 +155,7 @@ Pour exporter toutes les données au format JSON :
 Les requêtes nécessitant une authentification utilisent HTTP Basic Auth :
 
 ```bash
-curl -u admin:locapp2024 -X PUT http://localhost:5000/api/general \
+curl -u admin:locapp2024 -X PUT http://localhost:5001/api/general \
   -H "Content-Type: application/json" \
   -d '{"property_name":"Mon Mazet", ...}'
 ```
@@ -228,14 +228,14 @@ python app.py
 
 ```bash
 # Dans app.py, modifiez la dernière ligne :
-app.run(debug=False, host='0.0.0.0', port=5000)
+app.run(debug=False, host='0.0.0.0', port=5001)
 ```
 
 ### Option 3 : Déploiement avec Gunicorn (recommandé)
 
 ```bash
 pip install gunicorn
-gunicorn -w 4 -b 0.0.0.0:5000 app:app
+gunicorn -w 4 -b 0.0.0.0:5001 app:app
 ```
 
 ### Option 4 : Déploiement cloud (Heroku, Railway, etc.)

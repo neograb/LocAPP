@@ -1,12 +1,12 @@
 # Configuration Developpement
-# Port: 6001
+# Port: 5001
 
 import os
 
 class DevelopmentConfig:
     # Server
     HOST = '0.0.0.0'
-    PORT = 6001
+    PORT = 5001
     DEBUG = True
 
     # Database
@@ -21,7 +21,7 @@ class DevelopmentConfig:
     SESSION_COOKIE_SAMESITE = 'Lax'
 
     # OAuth - Development URLs
-    GOOGLE_REDIRECT_URI = 'http://localhost:6001/api/auth/google/callback'
+    GOOGLE_REDIRECT_URI = 'http://localhost:5001/api/auth/google/callback'
 
     # Logging
     LOG_LEVEL = 'DEBUG'

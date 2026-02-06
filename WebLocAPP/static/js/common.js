@@ -105,7 +105,14 @@ async function fetchAPI(url, options = {}) {
         const finalUrl = url.startsWith('/api/') && !url.includes('/api/properties')
             ? getApiUrl(url)
             : url;
-        const response = await fetch(finalUrl, options);
+
+        // Ensure credentials are included for session-based authentication
+        const fetchOptions = {
+            ...options,
+            credentials: 'same-origin'
+        };
+
+        const response = await fetch(finalUrl, fetchOptions);
 
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);

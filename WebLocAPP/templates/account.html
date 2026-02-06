@@ -104,7 +104,10 @@
     <div class="card">
         <div class="card-header">
             <h2 class="card-title">Mes Propriétés</h2>
-            <span class="property-count" id="propertyCount">0/1</span>
+            <div class="header-actions">
+                <span class="property-count" id="propertyCount">0/1</span>
+                <button class="btn btn-primary btn-sm" id="btnAddProperty" onclick="goToNewProperty()">+ Nouvelle propriété</button>
+            </div>
         </div>
 
         <div class="properties-list" id="propertiesList">
@@ -440,11 +443,22 @@
 }
 
 /* Properties List */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
 .property-count {
     background: var(--primary-color);
     color: white;
     padding: 0.25rem 0.75rem;
     border-radius: 20px;
+    font-size: 0.85rem;
+}
+
+.btn-sm {
+    padding: 0.4rem 0.8rem;
     font-size: 0.85rem;
 }
 
@@ -991,6 +1005,9 @@ async function loadProperties() {
                     <span style="font-size: 3rem;">🏠</span>
                     <p>Aucune propriété pour le moment</p>
                     <p style="font-size: 0.85rem;">Créez votre première propriété pour commencer</p>
+                    <button class="btn btn-primary" onclick="goToNewProperty()" style="margin-top: 1rem;">
+                        + Créer ma première propriété
+                    </button>
                 </div>
             `;
             return;
@@ -1065,9 +1082,14 @@ async function deleteProperty(propertyId, propertyName) {
 
         if (response.ok) {
             showAlert('Propriété supprimée', 'success');
+            // Clear localStorage if this was the current property
+            const savedProperty = localStorage.getItem('locapp_current_property');
+            if (savedProperty == propertyId) {
+                localStorage.removeItem('locapp_current_property');
+            }
             loadProperties();
-            // Refresh page to update property selector
-            setTimeout(() => window.location.reload(), 1000);
+            // Redirect to property creation page
+            setTimeout(() => window.location.href = '/property/new', 1000);
         } else {
             showAlert(result.error || 'Erreur', 'error');
         }
@@ -1162,10 +1184,10 @@ async function confirmChangePlan() {
         const result = await response.json();
 
         if (response.ok) {
-            showAlert('Abonnement mis à jour', 'success');
+            showAlert('Abonnement mis à jour ! Rechargement...', 'success');
             closeChangePlanModal();
-            loadSubscription();
-            loadProperties();
+            // Reload the page to refresh all data including sidebar
+            setTimeout(() => window.location.reload(), 1000);
         } else {
             showAlert(result.error || 'Erreur', 'error');
         }
@@ -1267,9 +1289,46 @@ document.getElementById('deleteAccountModal').addEventListener('click', function
     }
 });
 
+// Navigate to new property page
+function goToNewProperty() {
+    // Clear any stale localStorage to ensure clean navigation
+    localStorage.removeItem('locapp_current_property');
+    // Navigate directly - property_new.html will handle limit checking and show appropriate message
+    window.location.href = '/property/new';
+}
+
+// Update add property button state based on limits
+async function updateAddPropertyButton() {
+    const btn = document.getElementById('btnAddProperty');
+    if (!btn) return;
+
+    try {
+        const response = await fetch('/api/subscription/can-create-property', {
+            credentials: 'same-origin'
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+
+        if (!data.can_create) {
+            // Don't disable - just add visual hint. goToNewProperty() will handle the error message
+            btn.title = 'Limite de propriétés atteinte pour votre plan';
+            btn.style.opacity = '0.6';
+            btn.classList.add('limit-reached');
+        } else {
+            // Ensure button is enabled and styled correctly
+            btn.title = '';
+            btn.style.opacity = '1';
+            btn.classList.remove('limit-reached');
+        }
+    } catch (error) {
+        console.error('Error checking property limit:', error);
+    }
+}
+
 // Initialize
 loadUserData();
 loadSubscription();
 loadProperties();
+updateAddPropertyButton();
 </script>
 {% endblock %}

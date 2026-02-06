@@ -4,6 +4,70 @@
 
 {% block content %}
 <style>
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    .header-buttons {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+    .btn-ai-generate {
+        background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 50%, #4f46e5 100%);
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        transition: all 0.3s ease;
+    }
+    .btn-ai-generate:hover:not(:disabled) {
+        background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 50%, #4338ca 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+    }
+    .btn-ai-generate:disabled {
+        background: #d1d5db;
+        color: #9ca3af;
+        cursor: not-allowed;
+    }
+    .btn-ai-generate .spinner {
+        width: 14px;
+        height: 14px;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .ai-tooltip { position: relative; }
+    .ai-tooltip::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #1f2937;
+        color: white;
+        padding: 0.5rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        white-space: nowrap;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.2s ease;
+        margin-bottom: 0.5rem;
+    }
+    .ai-tooltip:hover::after { opacity: 1; visibility: visible; }
     .section-card {
         background: var(--card-bg);
         border: 1px solid var(--border-color);
@@ -168,7 +232,18 @@
         <div class="card">
             <div class="card-header">
                 <h2 class="card-title">Gestion des Activités</h2>
-                <button class="btn btn-primary" onclick="openAddModal()">+ Ajouter</button>
+                <div class="header-buttons">
+                    {% if has_ai_access %}
+                    <button type="button" class="btn-ai-generate" id="btnAiGenerate" onclick="regenerateWithAI()">
+                        <span>✨</span> Régénérer avec l'IA
+                    </button>
+                    {% else %}
+                    <button type="button" class="btn-ai-generate ai-tooltip" disabled data-tooltip="Fonctionnalité réservée aux abonnés">
+                        <span>✨</span> Régénérer avec l'IA
+                    </button>
+                    {% endif %}
+                    <button class="btn btn-primary" onclick="openAddModal()">+ Ajouter</button>
+                </div>
             </div>
 
             <div id="sectionsContainer">
@@ -808,6 +883,40 @@ document.getElementById('categoryForm').addEventListener('submit', async (e) => 
         showAlert('Erreur de connexion', 'error');
     }
 });
+
+// AI Regeneration
+async function regenerateWithAI() {
+    if (!confirmAction('Régénérer toutes les activités avec l\'IA ? Les activités existantes seront remplacées.')) return;
+
+    const btn = document.getElementById('btnAiGenerate');
+    const originalContent = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Génération...';
+
+    try {
+        const response = await fetch('/api/ai/regenerate/activities', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Property-ID': localStorage.getItem('locapp_current_property')
+            }
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showAlert('Activités régénérées avec succès !', 'success');
+            loadCategories().then(() => loadActivities());
+        } else {
+            showAlert(result.error || 'Erreur lors de la régénération', 'error');
+        }
+    } catch (error) {
+        showAlert('Erreur de connexion', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalContent;
+    }
+}
 
 // Initialize
 loadCategories().then(() => loadActivities());

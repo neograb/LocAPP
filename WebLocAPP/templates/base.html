@@ -176,7 +176,11 @@
             }
         }
         function handlePropertyChange(select) {
+            console.log('handlePropertyChange called, value:', select.value);
             if (select.value === 'new') {
+                // Clear localStorage before navigating to ensure clean state
+                localStorage.removeItem('locapp_current_property');
+                console.log('Navigating to /property/new');
                 window.location.href = '/property/new';
             } else {
                 // Save the selected property ID
@@ -199,9 +203,31 @@
                 const hasProperties = Array.from(propertySelector.options).some(opt => opt.value !== 'new');
 
                 if (!hasProperties && window.location.pathname !== '/property/new') {
-                    // Redirect to property creation page if user has no properties
+                    // Clear any stale localStorage and redirect to property creation page
+                    localStorage.removeItem('locapp_current_property');
                     window.location.href = '/property/new';
                     return;
+                }
+
+                // Verify saved property ID still exists
+                const savedProperty = localStorage.getItem('locapp_current_property');
+                if (savedProperty) {
+                    const propertyExists = Array.from(propertySelector.options).some(opt => opt.value === savedProperty);
+                    if (!propertyExists) {
+                        // Clear invalid property ID
+                        localStorage.removeItem('locapp_current_property');
+                        // Select first available property if exists
+                        if (hasProperties) {
+                            const firstProperty = Array.from(propertySelector.options).find(opt => opt.value !== 'new');
+                            if (firstProperty) {
+                                propertySelector.value = firstProperty.value;
+                                localStorage.setItem('locapp_current_property', firstProperty.value);
+                            }
+                        }
+                    } else {
+                        // Restore saved selection
+                        propertySelector.value = savedProperty;
+                    }
                 }
 
                 updateRegionDisplay(propertySelector);
