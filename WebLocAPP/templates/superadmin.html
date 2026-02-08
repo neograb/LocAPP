@@ -555,7 +555,7 @@
                     <a class="nav-item" data-section="sessions">
                         <span class="nav-item-icon">&#128994;</span>
                         <span>Sessions Web</span>
-                        <span class="nav-item-badge">{{ stats.active_sessions }}</span>
+                        <span class="nav-item-badge" id="badgeWebSessions">{{ stats.active_sessions }}</span>
                     </a>
                     <a class="nav-item" data-section="users">
                         <span class="nav-item-icon">&#128101;</span>
@@ -574,7 +574,7 @@
                     <a class="nav-item" data-section="mobile-sessions">
                         <span class="nav-item-icon">&#128241;</span>
                         <span>Sessions Mobiles</span>
-                        <span class="nav-item-badge">{{ stats.mobile_sessions }}</span>
+                        <span class="nav-item-badge" id="badgeMobileSessions">{{ stats.mobile_sessions }}</span>
                     </a>
                     <a class="nav-item" data-section="mobile-users">
                         <span class="nav-item-icon">&#128100;</span>
@@ -674,36 +674,38 @@
                         <h3>&#128994; Proprietaires connectes (Web)</h3>
                         <button class="btn btn-primary" onclick="refreshSessions()">Actualiser</button>
                     </div>
-                    {% if active_sessions %}
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Utilisateur</th>
-                                <th>Email</th>
-                                <th>Connexion</th>
-                                <th>Derniere activite</th>
-                                <th>IP</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for sess in active_sessions %}
-                            <tr>
-                                <td><strong>{{ sess.firstname }} {{ sess.lastname }}</strong></td>
-                                <td>{{ sess.email }}</td>
-                                <td>{{ sess.login_time[:19] if sess.login_time else '-' }}</td>
-                                <td>{{ sess.last_activity[:19] if sess.last_activity else '-' }}</td>
-                                <td>{{ sess.ip_address }}</td>
-                                <td class="actions">
-                                    <button class="btn btn-danger btn-sm" onclick="disconnectSession('{{ sess.token_preview }}', '{{ sess.email }}')">Deconnecter</button>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                    {% else %}
-                    <p style="color: #8b949e; text-align: center; padding: 2rem;">Aucun utilisateur connecte</p>
-                    {% endif %}
+                    <div id="webSessionsContainer">
+                        {% if active_sessions %}
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Utilisateur</th>
+                                    <th>Email</th>
+                                    <th>Connexion</th>
+                                    <th>Derniere activite</th>
+                                    <th>IP</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for sess in active_sessions %}
+                                <tr>
+                                    <td><strong>{{ sess.firstname or '' }} {{ sess.lastname or '' }}</strong></td>
+                                    <td>{{ sess.email or '-' }}</td>
+                                    <td>{{ (sess.login_time|string)[:19] if sess.login_time else '-' }}</td>
+                                    <td>{{ (sess.last_activity|string)[:19] if sess.last_activity else '-' }}</td>
+                                    <td>{{ sess.ip_address or '-' }}</td>
+                                    <td class="actions">
+                                        <button class="btn btn-danger btn-sm" onclick="disconnectSession('{{ sess.token_preview }}', '{{ sess.email }}')">Deconnecter</button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p style="color: #8b949e; text-align: center; padding: 2rem;">Aucun utilisateur connecte</p>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
 
@@ -830,43 +832,45 @@
                 <div class="section">
                     <div class="section-header">
                         <h3>&#128241; Appareils connectes</h3>
-                        <button class="btn btn-primary" onclick="refreshData()">Actualiser</button>
+                        <button class="btn btn-primary" onclick="refreshMobileSessions()">Actualiser</button>
                     </div>
-                    {% if mobile_sessions %}
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Utilisateur</th>
-                                <th>Email</th>
-                                <th>Appareil</th>
-                                <th>Version App</th>
-                                <th>Derniere activite</th>
-                                <th>IP</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for sess in mobile_sessions %}
-                            <tr>
-                                <td><strong>{{ sess.firstname }} {{ sess.lastname }}</strong></td>
-                                <td>{{ sess.email }}</td>
-                                <td>
-                                    <span style="color: #a855f7;">{{ sess.device_name or 'Inconnu' }}</span><br>
-                                    <small style="color: #8b949e;">{{ sess.device_model or '' }} {{ sess.os_version or '' }}</small>
-                                </td>
-                                <td>{{ sess.app_version or '-' }}</td>
-                                <td>{{ sess.last_activity[:19] if sess.last_activity else '-' }}</td>
-                                <td>{{ sess.ip_address or '-' }}</td>
-                                <td class="actions">
-                                    <button class="btn btn-danger btn-sm" onclick="disconnectMobileSession({{ sess.id }}, '{{ sess.email }}')">Deconnecter</button>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                    {% else %}
-                    <p style="color: #8b949e; text-align: center; padding: 2rem;">Aucun appareil mobile connecte</p>
-                    {% endif %}
+                    <div id="mobileSessionsContainer">
+                        {% if mobile_sessions %}
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Utilisateur</th>
+                                    <th>Email</th>
+                                    <th>Appareil</th>
+                                    <th>Version App</th>
+                                    <th>Derniere activite</th>
+                                    <th>IP</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mobileSessionsBody">
+                                {% for sess in mobile_sessions %}
+                                <tr>
+                                    <td><strong>{{ sess.firstname or '' }} {{ sess.lastname or '' }}</strong></td>
+                                    <td>{{ sess.email or '-' }}</td>
+                                    <td>
+                                        <span style="color: #a855f7;">{{ sess.device_name or 'Inconnu' }}</span><br>
+                                        <small style="color: #8b949e;">{{ sess.device_model or '' }} {{ sess.os_version or '' }}</small>
+                                    </td>
+                                    <td>{{ sess.app_version or '-' }}</td>
+                                    <td>{{ (sess.last_activity|string)[:19] if sess.last_activity else '-' }}</td>
+                                    <td>{{ sess.ip_address or '-' }}</td>
+                                    <td class="actions">
+                                        <button class="btn btn-danger btn-sm" onclick="disconnectMobileSession({{ sess.id }}, '{{ sess.email }}')">Deconnecter</button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p style="color: #8b949e; text-align: center; padding: 2rem;">Aucun appareil mobile connecte</p>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
 
@@ -1268,7 +1272,136 @@
         }
 
         function refreshData() { window.location.reload(); }
-        function refreshSessions() { window.location.reload(); }
+
+        // Refresh web sessions via AJAX
+        async function refreshSessions() {
+            try {
+                const response = await fetch('/superadmin/api/sessions');
+                const data = await response.json();
+
+                if (data.error) {
+                    showAlert('Erreur: ' + data.error, 'error');
+                    return;
+                }
+
+                // Update badge in sidebar
+                const badge = document.getElementById('badgeWebSessions');
+                if (badge) badge.textContent = data.count || 0;
+
+                const container = document.getElementById('webSessionsContainer');
+                if (!data.sessions || data.sessions.length === 0) {
+                    container.innerHTML = '<p style="color: #8b949e; text-align: center; padding: 2rem;">Aucun utilisateur connecte</p>';
+                    showAlert('Sessions web actualisees (0)', 'success');
+                    return;
+                }
+
+                let html = `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Utilisateur</th>
+                                <th>Email</th>
+                                <th>Connexion</th>
+                                <th>Derniere activite</th>
+                                <th>IP</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                data.sessions.forEach(sess => {
+                    const loginTime = sess.login_time ? String(sess.login_time).substring(0, 19) : '-';
+                    const lastActivity = sess.last_activity ? String(sess.last_activity).substring(0, 19) : '-';
+                    html += `
+                        <tr>
+                            <td><strong>${sess.firstname || ''} ${sess.lastname || ''}</strong></td>
+                            <td>${sess.email || '-'}</td>
+                            <td>${loginTime}</td>
+                            <td>${lastActivity}</td>
+                            <td>${sess.ip_address || '-'}</td>
+                            <td class="actions">
+                                <button class="btn btn-danger btn-sm" onclick="disconnectSession('${sess.token_preview}', '${sess.email}')">Deconnecter</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                html += '</tbody></table>';
+                container.innerHTML = html;
+                showAlert('Sessions web actualisees (' + data.count + ')', 'success');
+            } catch (error) {
+                console.error('Error refreshing web sessions:', error);
+                showAlert('Erreur de connexion: ' + error.message, 'error');
+            }
+        }
+
+        // Refresh mobile sessions via AJAX
+        async function refreshMobileSessions() {
+            try {
+                const response = await fetch('/superadmin/api/mobile-sessions');
+                const data = await response.json();
+
+                if (data.error) {
+                    showAlert('Erreur: ' + data.error, 'error');
+                    return;
+                }
+
+                // Update badge in sidebar
+                const badge = document.getElementById('badgeMobileSessions');
+                if (badge) badge.textContent = data.count || 0;
+
+                const container = document.getElementById('mobileSessionsContainer');
+                if (!data.sessions || data.sessions.length === 0) {
+                    container.innerHTML = '<p style="color: #8b949e; text-align: center; padding: 2rem;">Aucun appareil mobile connecte</p>';
+                    showAlert('Sessions mobiles actualisees (0)', 'success');
+                    return;
+                }
+
+                let html = `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Utilisateur</th>
+                                <th>Email</th>
+                                <th>Appareil</th>
+                                <th>Version App</th>
+                                <th>Derniere activite</th>
+                                <th>IP</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mobileSessionsBody">
+                `;
+
+                data.sessions.forEach(sess => {
+                    const lastActivity = sess.last_activity ? String(sess.last_activity).substring(0, 19) : '-';
+                    html += `
+                        <tr>
+                            <td><strong>${sess.firstname || ''} ${sess.lastname || ''}</strong></td>
+                            <td>${sess.email || '-'}</td>
+                            <td>
+                                <span style="color: #a855f7;">${sess.device_name || 'Inconnu'}</span><br>
+                                <small style="color: #8b949e;">${sess.device_model || ''} ${sess.os_version || ''}</small>
+                            </td>
+                            <td>${sess.app_version || '-'}</td>
+                            <td>${lastActivity}</td>
+                            <td>${sess.ip_address || '-'}</td>
+                            <td class="actions">
+                                <button class="btn btn-danger btn-sm" onclick="disconnectMobileSession(${sess.id}, '${sess.email}')">Deconnecter</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                html += '</tbody></table>';
+                container.innerHTML = html;
+                showAlert('Sessions mobiles actualisees (' + data.count + ')', 'success');
+            } catch (error) {
+                console.error('Error refreshing mobile sessions:', error);
+                showAlert('Erreur de connexion: ' + error.message, 'error');
+            }
+        }
 
         // Copy to clipboard
         function copyToClipboard(text) {

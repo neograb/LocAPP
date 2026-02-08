@@ -2465,25 +2465,29 @@ class Database:
 
     def get_all_mobile_sessions(self, active_only=True):
         """Get all mobile sessions for SuperAdmin view"""
-        conn = self.get_connection()
-        if active_only:
-            query = '''
-                SELECT ms.*, mu.email, mu.firstname, mu.lastname
-                FROM mobile_sessions ms
-                JOIN mobile_users mu ON ms.mobile_user_id = mu.id
-                WHERE ms.is_active = 1
-                ORDER BY ms.last_activity DESC
-            '''
-        else:
-            query = '''
-                SELECT ms.*, mu.email, mu.firstname, mu.lastname
-                FROM mobile_sessions ms
-                JOIN mobile_users mu ON ms.mobile_user_id = mu.id
-                ORDER BY ms.last_activity DESC
-            '''
-        results = conn.execute(query).fetchall()
-        conn.close()
-        return [dict(r) for r in results]
+        try:
+            conn = self.get_connection()
+            if active_only:
+                query = '''
+                    SELECT ms.*, mu.email, mu.firstname, mu.lastname
+                    FROM mobile_sessions ms
+                    JOIN mobile_users mu ON ms.mobile_user_id = mu.id
+                    WHERE ms.is_active = 1
+                    ORDER BY ms.last_activity DESC
+                '''
+            else:
+                query = '''
+                    SELECT ms.*, mu.email, mu.firstname, mu.lastname
+                    FROM mobile_sessions ms
+                    JOIN mobile_users mu ON ms.mobile_user_id = mu.id
+                    ORDER BY ms.last_activity DESC
+                '''
+            results = conn.execute(query).fetchall()
+            conn.close()
+            return [dict(r) for r in results]
+        except Exception as e:
+            print(f"[Database] Error getting mobile sessions: {e}")
+            return []
 
     def get_mobile_sessions_count(self):
         """Get count of active mobile sessions"""

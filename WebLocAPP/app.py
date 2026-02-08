@@ -2517,18 +2517,29 @@ def superadmin_dashboard():
     # Get active sessions
     active_sessions = get_active_sessions()
 
-    # Get mobile sessions
-    mobile_sessions = db.get_all_mobile_sessions(active_only=True)
+    # Get mobile sessions (with error handling)
+    try:
+        mobile_sessions_list = db.get_all_mobile_sessions(active_only=True)
+    except Exception as e:
+        print(f"[SuperAdmin] Error getting mobile sessions: {e}")
+        mobile_sessions_list = []
 
-    # Get stats
+    # Get stats with error handling for each table
+    def safe_count(query):
+        try:
+            result = conn.execute(query).fetchone()
+            return result[0] if result else 0
+        except Exception:
+            return 0
+
     stats = {
-        'users': conn.execute('SELECT COUNT(*) FROM users').fetchone()[0],
-        'mobile_users': conn.execute('SELECT COUNT(*) FROM mobile_users').fetchone()[0],
-        'properties': conn.execute('SELECT COUNT(*) FROM properties').fetchone()[0],
-        'activities': conn.execute('SELECT COUNT(*) FROM activities').fetchone()[0],
-        'services': conn.execute('SELECT COUNT(*) FROM nearby_services').fetchone()[0],
+        'users': safe_count('SELECT COUNT(*) FROM users'),
+        'mobile_users': safe_count('SELECT COUNT(*) FROM mobile_users'),
+        'properties': safe_count('SELECT COUNT(*) FROM properties'),
+        'activities': safe_count('SELECT COUNT(*) FROM activities'),
+        'services': safe_count('SELECT COUNT(*) FROM nearby_services'),
         'active_sessions': len(active_sessions),
-        'mobile_sessions': len(mobile_sessions),
+        'mobile_sessions': len(mobile_sessions_list),
     }
 
     # Get all users (web users / property owners)
@@ -2554,7 +2565,7 @@ def superadmin_dashboard():
         mobile_users=mobile_users,
         properties=properties,
         active_sessions=active_sessions,
-        mobile_sessions=mobile_sessions,
+        mobile_sessions=mobile_sessions_list,
         admin_user=session.get('superadmin_user', 'Admin')
     )
 
@@ -3017,6 +3028,24 @@ def mobile_register():
         'lastname': lastname
     }
 
+    # Get device info from request
+    device_name = data.get('device_name')
+    device_model = data.get('device_model')
+    os_version = data.get('os_version')
+    app_version = data.get('app_version')
+    ip_address = request.remote_addr
+
+    # Persist session in database for SuperAdmin visibility
+    db.create_mobile_session(
+        mobile_user_id=user_id,
+        token=token,
+        device_name=device_name,
+        device_model=device_model,
+        os_version=os_version,
+        app_version=app_version,
+        ip_address=ip_address
+    )
+
     return jsonify({
         'success': True,
         'token': token,
@@ -3057,6 +3086,24 @@ def mobile_login():
         'lastname': user['lastname']
     }
 
+    # Get device info from request
+    device_name = data.get('device_name')
+    device_model = data.get('device_model')
+    os_version = data.get('os_version')
+    app_version = data.get('app_version')
+    ip_address = request.remote_addr
+
+    # Persist session in database for SuperAdmin visibility
+    db.create_mobile_session(
+        mobile_user_id=user['id'],
+        token=token,
+        device_name=device_name,
+        device_model=device_model,
+        os_version=os_version,
+        app_version=app_version,
+        ip_address=ip_address
+    )
+
     return jsonify({
         'success': True,
         'token': token,
@@ -3075,8 +3122,11 @@ def mobile_logout():
     auth_header = request.headers.get('Authorization', '')
     if auth_header.startswith('Bearer '):
         token = auth_header[7:]
+        # Supprimer de la mémoire
         if token in mobile_sessions:
             del mobile_sessions[token]
+        # Désactiver la session en base de données
+        db.deactivate_mobile_session(token)
     return jsonify({'success': True})
 
 @app.route('/api/mobile/auth/me')
