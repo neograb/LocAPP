@@ -311,6 +311,75 @@ class Database:
             )
         ''')
 
+        # Table pour les utilisateurs mobiles (voyageurs - distincts des propriétaires)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS mobile_users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT NOT NULL UNIQUE,
+                firstname TEXT NOT NULL,
+                lastname TEXT NOT NULL,
+                password_hash TEXT NOT NULL,
+                is_active BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # Table pour les jetons d'accès aux propriétés (générés par les propriétaires)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS property_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                property_id INTEGER NOT NULL,
+                token TEXT NOT NULL UNIQUE,
+                valid_from TIMESTAMP NOT NULL,
+                valid_until TIMESTAMP NOT NULL,
+                is_active BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (property_id) REFERENCES properties(id)
+            )
+        ''')
+
+        # Table pour les réservations mobiles (lien entre mobile_user et property via token)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS mobile_reservations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                mobile_user_id INTEGER NOT NULL,
+                property_id INTEGER NOT NULL,
+                token_id INTEGER NOT NULL,
+                booking_url TEXT,
+                personal_comment TEXT,
+                is_active BOOLEAN DEFAULT 1,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                expires_at TIMESTAMP NOT NULL,
+                FOREIGN KEY (mobile_user_id) REFERENCES mobile_users(id),
+                FOREIGN KEY (property_id) REFERENCES properties(id),
+                FOREIGN KEY (token_id) REFERENCES property_tokens(id)
+            )
+        ''')
+
+        # Table pour l'historique des réservations mobiles
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS mobile_reservation_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                mobile_user_id INTEGER NOT NULL,
+                property_name TEXT NOT NULL,
+                property_slug TEXT,
+                property_address TEXT,
+                booking_url TEXT,
+                personal_comment TEXT,
+                stayed_from TIMESTAMP,
+                stayed_until TIMESTAMP,
+                archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (mobile_user_id) REFERENCES mobile_users(id)
+            )
+        ''')
+
+        # Migration: add property_slug column if it doesn't exist
+        try:
+            cursor.execute('ALTER TABLE mobile_reservation_history ADD COLUMN property_slug TEXT')
+        except:
+            pass  # Column already exists
+
         conn.commit()
 
         # Migrer les données existantes et insérer les valeurs par défaut
@@ -2159,3 +2228,421 @@ class Database:
 
         conn.commit()
         conn.close()
+
+    # ==================== Mobile Users Management ====================
+
+    def create_mobile_user(self, email, firstname, lastname, password_hash):
+        """Create a new mobile user (voyageur)"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT INTO mobile_users (email, firstname, lastname, password_hash)
+                VALUES (?, ?, ?, ?)
+            ''', (email, firstname, lastname, password_hash))
+            conn.commit()
+            user_id = cursor.lastrowid
+            conn.close()
+            return user_id
+        except sqlite3.IntegrityError:
+            conn.close()
+            return None  # Email already exists
+
+    def get_mobile_user_by_email(self, email):
+        """Get mobile user by email"""
+        conn = self.get_connection()
+        result = conn.execute(
+            'SELECT * FROM mobile_users WHERE email=? AND is_active=1',
+            (email,)
+        ).fetchone()
+        conn.close()
+        return dict(result) if result else None
+
+    def get_mobile_user_by_id(self, user_id):
+        """Get mobile user by ID"""
+        conn = self.get_connection()
+        result = conn.execute(
+            'SELECT id, email, firstname, lastname, created_at FROM mobile_users WHERE id=? AND is_active=1',
+            (user_id,)
+        ).fetchone()
+        conn.close()
+        return dict(result) if result else None
+
+    def update_mobile_user(self, user_id, firstname=None, lastname=None, password_hash=None):
+        """Update mobile user info"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        updates = []
+        params = []
+        if firstname:
+            updates.append('firstname=?')
+            params.append(firstname)
+        if lastname:
+            updates.append('lastname=?')
+            params.append(lastname)
+        if password_hash:
+            updates.append('password_hash=?')
+            params.append(password_hash)
+
+        if updates:
+            updates.append('updated_at=CURRENT_TIMESTAMP')
+            params.append(user_id)
+            cursor.execute(f'''
+                UPDATE mobile_users SET {', '.join(updates)} WHERE id=?
+            ''', params)
+            conn.commit()
+
+        conn.close()
+
+    def delete_mobile_user(self, user_id):
+        """Delete a mobile user account (soft delete)"""
+        conn = self.get_connection()
+        conn.execute(
+            'UPDATE mobile_users SET is_active=0, updated_at=CURRENT_TIMESTAMP WHERE id=?',
+            (user_id,)
+        )
+        conn.commit()
+        conn.close()
+
+    # ==================== Property Tokens Management ====================
+
+    def create_property_token(self, property_id, token, valid_from, valid_until):
+        """Create a new access token for a property"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO property_tokens (property_id, token, valid_from, valid_until)
+            VALUES (?, ?, ?, ?)
+        ''', (property_id, token, valid_from, valid_until))
+        conn.commit()
+        token_id = cursor.lastrowid
+        conn.close()
+        return token_id
+
+    def get_property_token(self, token):
+        """Get token info by token string"""
+        conn = self.get_connection()
+        result = conn.execute('''
+            SELECT pt.*, p.name as property_name, p.slug as property_slug
+            FROM property_tokens pt
+            JOIN properties p ON pt.property_id = p.id
+            WHERE pt.token=? AND pt.is_active=1
+        ''', (token,)).fetchone()
+        conn.close()
+        return dict(result) if result else None
+
+    def get_property_tokens(self, property_id):
+        """Get all tokens for a property"""
+        conn = self.get_connection()
+        results = conn.execute('''
+            SELECT * FROM property_tokens
+            WHERE property_id=?
+            ORDER BY created_at DESC
+        ''', (property_id,)).fetchall()
+        conn.close()
+        return [dict(row) for row in results]
+
+    def deactivate_property_token(self, token_id):
+        """Deactivate a property token"""
+        conn = self.get_connection()
+        conn.execute(
+            'UPDATE property_tokens SET is_active=0 WHERE id=?',
+            (token_id,)
+        )
+        conn.commit()
+        conn.close()
+
+    def is_token_valid(self, token):
+        """Check if a token is valid (exists, active, and within date range)"""
+        conn = self.get_connection()
+        result = conn.execute('''
+            SELECT pt.*, p.name as property_name, p.slug as property_slug
+            FROM property_tokens pt
+            JOIN properties p ON pt.property_id = p.id
+            WHERE pt.token=? AND pt.is_active=1
+            AND datetime('now', 'localtime') BETWEEN datetime(replace(pt.valid_from, 'T', ' ')) AND datetime(replace(pt.valid_until, 'T', ' '))
+        ''', (token,)).fetchone()
+        conn.close()
+        return dict(result) if result else None
+
+    # ==================== Mobile Reservations Management ====================
+
+    def add_mobile_reservation(self, mobile_user_id, property_id, token_id, expires_at, booking_url=None):
+        """Add a property to a mobile user's active reservations"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        # Check if reservation already exists
+        existing = conn.execute('''
+            SELECT id FROM mobile_reservations
+            WHERE mobile_user_id=? AND property_id=? AND is_active=1
+        ''', (mobile_user_id, property_id)).fetchone()
+
+        if existing:
+            conn.close()
+            return existing['id']  # Return existing reservation ID
+
+        cursor.execute('''
+            INSERT INTO mobile_reservations (mobile_user_id, property_id, token_id, booking_url, expires_at)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (mobile_user_id, property_id, token_id, booking_url, expires_at))
+        conn.commit()
+        reservation_id = cursor.lastrowid
+        conn.close()
+        return reservation_id
+
+    def get_mobile_user_reservations(self, mobile_user_id):
+        """Get all active reservations for a mobile user"""
+        conn = self.get_connection()
+        results = conn.execute('''
+            SELECT mr.*, p.name as property_name, p.slug as property_slug,
+                   p.icon as property_icon, a.city, a.street
+            FROM mobile_reservations mr
+            JOIN properties p ON mr.property_id = p.id
+            LEFT JOIN address a ON p.id = a.property_id
+            WHERE mr.mobile_user_id=? AND mr.is_active=1
+            ORDER BY mr.added_at DESC
+        ''', (mobile_user_id,)).fetchall()
+        conn.close()
+        return [dict(row) for row in results]
+
+    def update_reservation_comment(self, reservation_id, comment):
+        """Update personal comment on a reservation"""
+        conn = self.get_connection()
+        conn.execute(
+            'UPDATE mobile_reservations SET personal_comment=? WHERE id=?',
+            (comment, reservation_id)
+        )
+        conn.commit()
+        conn.close()
+
+    def remove_mobile_reservation(self, reservation_id, mobile_user_id):
+        """Remove a reservation (move to history)"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        # Get reservation details first
+        reservation = conn.execute('''
+            SELECT mr.*, p.name as property_name, p.slug as property_slug, a.street, a.city, a.postal_code
+            FROM mobile_reservations mr
+            JOIN properties p ON mr.property_id = p.id
+            LEFT JOIN address a ON p.id = a.property_id
+            WHERE mr.id=? AND mr.mobile_user_id=?
+        ''', (reservation_id, mobile_user_id)).fetchone()
+
+        if reservation:
+            # Archive to history
+            address = f"{reservation['street']}, {reservation['postal_code']} {reservation['city']}" if reservation['street'] else ""
+            cursor.execute('''
+                INSERT INTO mobile_reservation_history
+                (mobile_user_id, property_name, property_slug, property_address, booking_url, personal_comment, stayed_from, stayed_until)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                mobile_user_id,
+                reservation['property_name'],
+                reservation['property_slug'],
+                address,
+                reservation['booking_url'],
+                reservation['personal_comment'],
+                reservation['added_at'],
+                datetime.now().isoformat()
+            ))
+
+            # Deactivate the reservation
+            cursor.execute(
+                'UPDATE mobile_reservations SET is_active=0 WHERE id=?',
+                (reservation_id,)
+            )
+            conn.commit()
+
+        conn.close()
+
+    def get_mobile_user_history(self, mobile_user_id):
+        """Get reservation history for a mobile user"""
+        conn = self.get_connection()
+        results = conn.execute('''
+            SELECT * FROM mobile_reservation_history
+            WHERE mobile_user_id=?
+            ORDER BY archived_at DESC
+        ''', (mobile_user_id,)).fetchall()
+        conn.close()
+        return [dict(row) for row in results]
+
+    def delete_history_entry(self, history_id, mobile_user_id):
+        """Delete a history entry"""
+        conn = self.get_connection()
+        conn.execute(
+            'DELETE FROM mobile_reservation_history WHERE id=? AND mobile_user_id=?',
+            (history_id, mobile_user_id)
+        )
+        conn.commit()
+        conn.close()
+
+    def expire_reservations(self):
+        """Move expired reservations to history (called periodically)"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        # Find expired reservations
+        expired = conn.execute('''
+            SELECT mr.*, p.name as property_name, p.slug as property_slug, a.street, a.city, a.postal_code
+            FROM mobile_reservations mr
+            JOIN properties p ON mr.property_id = p.id
+            LEFT JOIN address a ON p.id = a.property_id
+            WHERE mr.is_active=1 AND datetime('now') > mr.expires_at
+        ''').fetchall()
+
+        for reservation in expired:
+            # Archive to history
+            address = f"{reservation['street']}, {reservation['postal_code']} {reservation['city']}" if reservation['street'] else ""
+            cursor.execute('''
+                INSERT INTO mobile_reservation_history
+                (mobile_user_id, property_name, property_slug, property_address, booking_url, personal_comment, stayed_from, stayed_until)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                reservation['mobile_user_id'],
+                reservation['property_name'],
+                reservation['property_slug'],
+                address,
+                reservation['booking_url'],
+                reservation['personal_comment'],
+                reservation['added_at'],
+                reservation['expires_at']
+            ))
+
+            # Deactivate
+            cursor.execute(
+                'UPDATE mobile_reservations SET is_active=0 WHERE id=?',
+                (reservation['id'],)
+            )
+
+        conn.commit()
+        conn.close()
+        return len(expired)
+
+    def get_full_property_data_for_mobile(self, property_id):
+        """Get all property data for mobile app display"""
+        conn = self.get_connection()
+
+        # Helper to convert SQLite integer booleans to Python booleans
+        def convert_booleans(d, bool_fields):
+            if d is None:
+                return None
+            result = dict(d)
+            for field in bool_fields:
+                if field in result and result[field] is not None:
+                    result[field] = bool(result[field])
+            return result
+
+        # Property info
+        property_data = conn.execute(
+            'SELECT * FROM properties WHERE id=?', (property_id,)
+        ).fetchone()
+        if not property_data:
+            conn.close()
+            return None
+
+        result = {'property': convert_booleans(property_data, ['is_active'])}
+
+        # General info
+        general = conn.execute(
+            'SELECT * FROM general_info WHERE property_id=?', (property_id,)
+        ).fetchone()
+        result['general'] = dict(general) if general else None
+
+        # WiFi
+        wifi = conn.execute(
+            'SELECT * FROM wifi_config WHERE property_id=?', (property_id,)
+        ).fetchone()
+        result['wifi'] = dict(wifi) if wifi else None
+
+        # Address
+        address = conn.execute(
+            'SELECT * FROM address WHERE property_id=?', (property_id,)
+        ).fetchone()
+        result['address'] = dict(address) if address else None
+
+        # Parking
+        parking = conn.execute(
+            'SELECT * FROM parking_info WHERE property_id=?', (property_id,)
+        ).fetchone()
+        result['parking'] = convert_booleans(parking, ['is_free'])
+
+        # Access
+        access = conn.execute(
+            'SELECT * FROM access_info WHERE property_id=?', (property_id,)
+        ).fetchone()
+        result['access'] = dict(access) if access else None
+
+        # Contact - strip "avatars/" prefix from avatar filename
+        contact = conn.execute(
+            'SELECT * FROM contact_info WHERE property_id=?', (property_id,)
+        ).fetchone()
+        if contact:
+            contact_dict = dict(contact)
+            # Strip "avatars/" prefix from avatar filename for mobile app
+            if contact_dict.get('avatar') and contact_dict['avatar'].startswith('avatars/'):
+                contact_dict['avatar'] = contact_dict['avatar'][8:]  # Remove "avatars/"
+            result['contact'] = contact_dict
+        else:
+            result['contact'] = None
+
+        # Emergency numbers
+        emergencies = conn.execute(
+            'SELECT * FROM emergency_numbers WHERE property_id=? ORDER BY display_order',
+            (property_id,)
+        ).fetchall()
+        result['emergencies'] = [dict(e) for e in emergencies]
+
+        # Services
+        services = conn.execute(
+            'SELECT * FROM nearby_services WHERE property_id=? ORDER BY display_order',
+            (property_id,)
+        ).fetchall()
+        result['services'] = [dict(s) for s in services]
+
+        # Activities with categories
+        categories = conn.execute(
+            'SELECT * FROM activity_categories WHERE property_id=? ORDER BY display_order',
+            (property_id,)
+        ).fetchall()
+        result['activity_categories'] = [dict(c) for c in categories]
+
+        activities = conn.execute(
+            'SELECT * FROM activities WHERE property_id=? ORDER BY display_order',
+            (property_id,)
+        ).fetchall()
+        result['activities'] = [dict(a) for a in activities]
+
+        # Photos - strip property_id prefix from filename for mobile app
+        photos = conn.execute(
+            'SELECT * FROM photos WHERE property_id=? ORDER BY display_order',
+            (property_id,)
+        ).fetchall()
+        photos_list = []
+        for p in photos:
+            photo_dict = dict(p)
+            # Strip "property_id/" prefix from filename
+            if '/' in photo_dict.get('filename', ''):
+                photo_dict['filename'] = photo_dict['filename'].split('/', 1)[1]
+            photos_list.append(photo_dict)
+        result['photos'] = photos_list
+
+        # Access photos - strip "access/property_id/" prefix from filename
+        access_photos = conn.execute(
+            'SELECT * FROM access_photos WHERE property_id=? ORDER BY display_order',
+            (property_id,)
+        ).fetchall()
+        access_photos_list = []
+        for p in access_photos:
+            photo_dict = dict(p)
+            # Strip "access/property_id/" prefix from filename
+            fn = photo_dict.get('filename', '')
+            if fn.startswith('access/') and '/' in fn[7:]:
+                photo_dict['filename'] = fn.split('/')[-1]
+            access_photos_list.append(photo_dict)
+        result['access_photos'] = access_photos_list
+
+        conn.close()
+        return result

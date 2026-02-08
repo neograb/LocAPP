@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, session
+from flask import Flask, render_template, request, jsonify, send_file, send_from_directory, redirect, url_for, session
 from flask_cors import CORS
 from authlib.integrations.flask_client import OAuth
 from database import Database
@@ -1850,6 +1850,46 @@ def download_export():
         json.dump(data, f, ensure_ascii=False, indent=2)
     return send_file(filename, as_attachment=True, download_name=filename)
 
+# ============================================
+# Routes pour servir les photos par slug (pour l'app mobile)
+# ============================================
+
+@app.route('/uploads/properties/<slug>/photos/<filename>')
+def serve_property_photo(slug, filename):
+    """Serve property photos by slug for mobile app"""
+    # Get property by slug to find its ID
+    property_info = db.get_property_by_slug(slug)
+    if not property_info:
+        return jsonify({'error': 'Property not found'}), 404
+
+    property_id = property_info['id']
+    photo_path = os.path.join(app.config['UPLOAD_FOLDER'], str(property_id))
+    return send_from_directory(photo_path, filename)
+
+@app.route('/uploads/properties/<slug>/access/<filename>')
+def serve_access_photo(slug, filename):
+    """Serve access photos by slug for mobile app"""
+    # Get property by slug to find its ID
+    property_info = db.get_property_by_slug(slug)
+    if not property_info:
+        return jsonify({'error': 'Property not found'}), 404
+
+    property_id = property_info['id']
+    photo_path = os.path.join(app.config['UPLOAD_FOLDER'], 'access', str(property_id))
+    return send_from_directory(photo_path, filename)
+
+@app.route('/uploads/avatars/<filename>')
+def serve_avatar(filename):
+    """Serve contact avatars for mobile app"""
+    avatar_path = os.path.join(app.config['UPLOAD_FOLDER'], 'avatars')
+    return send_from_directory(avatar_path, filename)
+
+@app.route('/uploads/headers/<filename>')
+def serve_header_image(filename):
+    """Serve header images for mobile app"""
+    headers_path = os.path.join(app.static_folder, 'uploads', 'headers')
+    return send_from_directory(headers_path, filename)
+
 # API Routes - Photos
 @app.route('/api/photos', methods=['GET'])
 def get_photos():
@@ -2727,6 +2767,359 @@ def api_guest_data(property_id):
     }
 
     return jsonify(property_data)
+
+# ============================================
+# MOBILE API ENDPOINTS
+# ============================================
+
+import secrets
+from functools import wraps
+
+# Mobile sessions storage (in production, use Redis or JWT)
+mobile_sessions = {}
+
+def generate_mobile_token():
+    """Generate a secure token for mobile sessions"""
+    return secrets.token_urlsafe(32)
+
+def get_mobile_user_from_token():
+    """Get mobile user from Authorization header"""
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        token = auth_header[7:]
+        if token in mobile_sessions:
+            return mobile_sessions[token]
+    return None
+
+def mobile_auth_required(f):
+    """Decorator to require mobile authentication"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        user = get_mobile_user_from_token()
+        if not user:
+            return jsonify({'error': 'Non authentifié'}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+# ----- Mobile Authentication -----
+
+@app.route('/api/mobile/auth/register', methods=['POST'])
+def mobile_register():
+    """Register a new mobile user (voyageur)"""
+    data = request.json
+    email = data.get('email', '').lower().strip()
+    firstname = data.get('firstname', '').strip()
+    lastname = data.get('lastname', '').strip()
+    password = data.get('password', '')
+
+    if not email or not firstname or not lastname or not password:
+        return jsonify({'error': 'Tous les champs sont requis'}), 400
+
+    # Check password strength
+    if len(password) < 6:
+        return jsonify({'error': 'Le mot de passe doit contenir au moins 6 caractères'}), 400
+
+    # Hash password
+    password_hash = hashlib.sha256(password.encode()).hexdigest()
+
+    # Create user
+    user_id = db.create_mobile_user(email, firstname, lastname, password_hash)
+    if not user_id:
+        return jsonify({'error': 'Cet email est déjà utilisé'}), 400
+
+    # Create session token
+    token = generate_mobile_token()
+    mobile_sessions[token] = {
+        'id': user_id,
+        'email': email,
+        'firstname': firstname,
+        'lastname': lastname
+    }
+
+    return jsonify({
+        'success': True,
+        'token': token,
+        'user': {
+            'id': user_id,
+            'email': email,
+            'firstname': firstname,
+            'lastname': lastname
+        }
+    })
+
+@app.route('/api/mobile/auth/login', methods=['POST'])
+def mobile_login():
+    """Login mobile user"""
+    data = request.json
+    email = data.get('email', '').lower().strip()
+    password = data.get('password', '')
+
+    if not email or not password:
+        return jsonify({'error': 'Email et mot de passe requis'}), 400
+
+    # Get user
+    user = db.get_mobile_user_by_email(email)
+    if not user:
+        return jsonify({'error': 'Email ou mot de passe incorrect'}), 401
+
+    # Check password
+    password_hash = hashlib.sha256(password.encode()).hexdigest()
+    if user['password_hash'] != password_hash:
+        return jsonify({'error': 'Email ou mot de passe incorrect'}), 401
+
+    # Create session token
+    token = generate_mobile_token()
+    mobile_sessions[token] = {
+        'id': user['id'],
+        'email': user['email'],
+        'firstname': user['firstname'],
+        'lastname': user['lastname']
+    }
+
+    return jsonify({
+        'success': True,
+        'token': token,
+        'user': {
+            'id': user['id'],
+            'email': user['email'],
+            'firstname': user['firstname'],
+            'lastname': user['lastname']
+        }
+    })
+
+@app.route('/api/mobile/auth/logout', methods=['POST'])
+@mobile_auth_required
+def mobile_logout():
+    """Logout mobile user"""
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        token = auth_header[7:]
+        if token in mobile_sessions:
+            del mobile_sessions[token]
+    return jsonify({'success': True})
+
+@app.route('/api/mobile/auth/me')
+@mobile_auth_required
+def mobile_me():
+    """Get current mobile user"""
+    user = get_mobile_user_from_token()
+    full_user = db.get_mobile_user_by_id(user['id'])
+    return jsonify({'user': full_user})
+
+@app.route('/api/mobile/auth/update', methods=['PUT'])
+@mobile_auth_required
+def mobile_update_profile():
+    """Update mobile user profile"""
+    user = get_mobile_user_from_token()
+    data = request.json
+
+    firstname = data.get('firstname')
+    lastname = data.get('lastname')
+    password = data.get('password')
+
+    password_hash = None
+    if password:
+        if len(password) < 6:
+            return jsonify({'error': 'Le mot de passe doit contenir au moins 6 caractères'}), 400
+        password_hash = hashlib.sha256(password.encode()).hexdigest()
+
+    db.update_mobile_user(user['id'], firstname, lastname, password_hash)
+
+    # Update session
+    if firstname:
+        user['firstname'] = firstname
+    if lastname:
+        user['lastname'] = lastname
+
+    return jsonify({'success': True, 'user': db.get_mobile_user_by_id(user['id'])})
+
+@app.route('/api/mobile/auth/delete', methods=['DELETE'])
+@mobile_auth_required
+def mobile_delete_account():
+    """Delete mobile user account"""
+    user = get_mobile_user_from_token()
+    db.delete_mobile_user(user['id'])
+
+    # Remove all sessions for this user
+    tokens_to_remove = [t for t, u in mobile_sessions.items() if u['id'] == user['id']]
+    for token in tokens_to_remove:
+        del mobile_sessions[token]
+
+    return jsonify({'success': True})
+
+# ----- Token Validation -----
+
+@app.route('/api/mobile/token/validate', methods=['POST'])
+@mobile_auth_required
+def mobile_validate_token():
+    """Validate a property access token and add to reservations"""
+    user = get_mobile_user_from_token()
+    data = request.json
+    token_code = data.get('token', '').strip().upper()
+
+    if not token_code:
+        return jsonify({'error': 'Code requis'}), 400
+
+    # Check if token is valid
+    token_info = db.is_token_valid(token_code)
+    if not token_info:
+        return jsonify({'error': 'Code invalide ou expiré'}), 400
+
+    # Add to reservations
+    reservation_id = db.add_mobile_reservation(
+        user['id'],
+        token_info['property_id'],
+        token_info['id'],
+        token_info['valid_until'],
+        data.get('booking_url')
+    )
+
+    return jsonify({
+        'success': True,
+        'reservation_id': reservation_id,
+        'property_name': token_info['property_name'],
+        'property_slug': token_info['property_slug'],
+        'valid_until': token_info['valid_until']
+    })
+
+# ----- Reservations -----
+
+@app.route('/api/mobile/reservations')
+@mobile_auth_required
+def mobile_get_reservations():
+    """Get all active reservations for current user"""
+    try:
+        user = get_mobile_user_from_token()
+        print(f"[DEBUG] Getting reservations for user {user['id']}")
+        reservations = db.get_mobile_user_reservations(user['id'])
+        print(f"[DEBUG] Found {len(reservations)} reservations")
+        return jsonify({'reservations': reservations})
+    except Exception as e:
+        print(f"[ERROR] mobile_get_reservations: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/mobile/reservations/<int:reservation_id>', methods=['DELETE'])
+@mobile_auth_required
+def mobile_remove_reservation(reservation_id):
+    """Remove a reservation (move to history)"""
+    user = get_mobile_user_from_token()
+    db.remove_mobile_reservation(reservation_id, user['id'])
+    return jsonify({'success': True})
+
+@app.route('/api/mobile/reservations/<int:reservation_id>/comment', methods=['PUT'])
+@mobile_auth_required
+def mobile_update_reservation_comment(reservation_id):
+    """Update personal comment on a reservation"""
+    data = request.json
+    comment = data.get('comment', '')
+    db.update_reservation_comment(reservation_id, comment)
+    return jsonify({'success': True})
+
+@app.route('/api/mobile/reservations/<int:reservation_id>/property')
+@mobile_auth_required
+def mobile_get_property_data(reservation_id):
+    """Get full property data for a reservation"""
+    user = get_mobile_user_from_token()
+
+    # Verify user owns this reservation
+    reservations = db.get_mobile_user_reservations(user['id'])
+    reservation = next((r for r in reservations if r['id'] == reservation_id), None)
+
+    if not reservation:
+        return jsonify({'error': 'Réservation non trouvée'}), 404
+
+    # Get full property data
+    property_data = db.get_full_property_data_for_mobile(reservation['property_id'])
+    if not property_data:
+        return jsonify({'error': 'Propriété non trouvée'}), 404
+
+    return jsonify(property_data)
+
+# ----- History -----
+
+@app.route('/api/mobile/history')
+@mobile_auth_required
+def mobile_get_history():
+    """Get reservation history for current user"""
+    user = get_mobile_user_from_token()
+    history = db.get_mobile_user_history(user['id'])
+    return jsonify({'history': history})
+
+@app.route('/api/mobile/history/<int:history_id>', methods=['DELETE'])
+@mobile_auth_required
+def mobile_delete_history(history_id):
+    """Delete a history entry"""
+    user = get_mobile_user_from_token()
+    db.delete_history_entry(history_id, user['id'])
+    return jsonify({'success': True})
+
+# ----- Property Owner Token Management -----
+
+@app.route('/api/properties/<int:property_id>/tokens', methods=['GET'])
+@login_required
+def get_property_tokens(property_id):
+    """Get all tokens for a property"""
+    user = get_current_user()
+    property_info = db.get_property(property_id)
+
+    if not property_info or property_info.get('user_id') != user.id:
+        return jsonify({'error': 'Non autorisé'}), 403
+
+    tokens = db.get_property_tokens(property_id)
+    return jsonify({'tokens': tokens})
+
+@app.route('/api/properties/<int:property_id>/tokens', methods=['POST'])
+@login_required
+def create_property_token(property_id):
+    """Create a new access token for a property"""
+    user = get_current_user()
+    property_info = db.get_property(property_id)
+
+    if not property_info or property_info.get('user_id') != user.id:
+        return jsonify({'error': 'Non autorisé'}), 403
+
+    data = request.json
+    valid_days = data.get('valid_days', 7)
+
+    # Generate unique token (6 characters, uppercase)
+    token_code = secrets.token_hex(3).upper()
+
+    # Calculate validity dates
+    from datetime import timedelta
+    valid_from = datetime.now()
+    valid_until = valid_from + timedelta(days=valid_days)
+
+    token_id = db.create_property_token(
+        property_id,
+        token_code,
+        valid_from.isoformat(),
+        valid_until.isoformat()
+    )
+
+    return jsonify({
+        'success': True,
+        'token': {
+            'id': token_id,
+            'code': token_code,
+            'valid_from': valid_from.isoformat(),
+            'valid_until': valid_until.isoformat()
+        }
+    })
+
+@app.route('/api/properties/<int:property_id>/tokens/<int:token_id>', methods=['DELETE'])
+@login_required
+def deactivate_token(property_id, token_id):
+    """Deactivate a property token"""
+    user = get_current_user()
+    property_info = db.get_property(property_id)
+
+    if not property_info or property_info.get('user_id') != user.id:
+        return jsonify({'error': 'Non autorisé'}), 403
+
+    db.deactivate_property_token(token_id)
+    return jsonify({'success': True})
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)
