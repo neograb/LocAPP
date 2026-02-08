@@ -502,3 +502,174 @@ Utilise les emojis fournis et varie les descriptions."""
         except Exception as e:
             print(f"[AI Service] Error finding restaurants: {e}")
             return []
+
+    def regenerate_single_activity(self, activity_name, category, city, region):
+        """Regenerate a single activity with AI
+
+        Args:
+            activity_name: Current name of the activity
+            category: Category of the activity (e.g., "Incontournables", "Sport", etc.)
+            city: City name
+            region: Region name
+
+        Returns:
+            Dictionary with new activity data: name, description, emoji
+        """
+        import random
+        client = self._get_openai_client()
+        model = os.environ.get('OPENAI_MODEL', 'gpt-4o-mini')
+
+        # Category-specific emoji pools
+        emoji_pools = {
+            "incontournables": ["🎯", "🏛️", "🌟", "✨", "🎭", "🏰", "🌸", "💎", "🗿", "🎨", "🌺", "🏆"],
+            "sport": ["⛷️", "🚴", "🏊", "🏄", "🧗", "🥾", "🎣", "⛵", "🏌️", "🎿", "🏃", "🚶"],
+            "restaurant": ["🍽️", "🍴", "🥘", "🍕", "🥗", "🍷", "🥐", "🧀", "🍝", "🥖", "🍲", "🥩"],
+            "visite": ["🏙️", "🗺️", "🌆", "🏘️", "🌉", "🗼", "🏤", "⛪"]
+        }
+
+        # Normalize category name for lookup
+        category_lower = category.lower()
+        category_key = None
+        for key in emoji_pools.keys():
+            if key in category_lower or category_lower in key:
+                category_key = key
+                break
+
+        emojis = emoji_pools.get(category_key, ["🎯", "✨", "🌟", "💫", "🔹"])
+        chosen_emoji = random.choice(emojis)
+
+        # Variation elements
+        tones = ["inspirant", "enthousiaste", "poétique", "informatif", "chaleureux"]
+        chosen_tone = random.choice(tones)
+
+        prompt = f"""Tu es un expert en tourisme en France. Régénère une activité UNIQUE et ORIGINALE.
+
+Contexte:
+- Activité actuelle: "{activity_name}"
+- Catégorie: {category}
+- Ville: {city}
+- Région: {region}
+
+Génère une NOUVELLE activité complètement différente dans la même catégorie pour cette région.
+Ton souhaité: {chosen_tone}
+
+Réponds UNIQUEMENT en JSON valide avec cette structure exacte (pas de texte avant ou après):
+{{
+    "name": "Nouveau nom d'activité original",
+    "description": "Description courte et {chosen_tone} (1-2 phrases)",
+    "emoji": "{chosen_emoji}"
+}}
+
+IMPORTANT:
+- Le nom doit être DIFFÉRENT de "{activity_name}"
+- La description doit être pertinente pour la région {region}
+- Sois créatif et original"""
+
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=300,
+                temperature=0.95
+            )
+
+            import json
+            content = response.choices[0].message.content.strip()
+            # Remove markdown code blocks if present
+            if content.startswith('```'):
+                content = content.split('```')[1]
+                if content.startswith('json'):
+                    content = content[4:]
+            content = content.strip()
+
+            activity = json.loads(content)
+            print(f"[AI Service] Regenerated activity: {activity.get('name')}")
+            return activity
+
+        except Exception as e:
+            print(f"[AI Service] Error regenerating activity: {e}")
+            return None
+
+    def find_service_by_category(self, category, latitude, longitude):
+        """Find the nearest service of a specific category using Google Places API
+
+        Args:
+            category: Service category (pharmacy, doctor, supermarket, bakery, restaurant, bank, gas_station, post)
+            latitude: Property latitude
+            longitude: Property longitude
+
+        Returns:
+            Dictionary with service info or None
+        """
+        if not self.google_maps_key:
+            print("[AI Service] Google Maps API key not configured")
+            return None
+
+        # Map our categories to Google Places types
+        category_to_google_type = {
+            'pharmacy': 'pharmacy',
+            'doctor': 'doctor',
+            'supermarket': 'supermarket',
+            'bakery': 'bakery',
+            'restaurant': 'restaurant',
+            'bank': 'bank',
+            'gas_station': 'gas_station',
+            'post': 'post_office'
+        }
+
+        google_type = category_to_google_type.get(category)
+        if not google_type:
+            print(f"[AI Service] Unknown category: {category}")
+            return None
+
+        try:
+            url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+            params = {
+                'location': f"{latitude},{longitude}",
+                'rankby': 'distance',
+                'type': google_type,
+                'key': self.google_maps_key,
+                'language': 'fr'
+            }
+
+            response = requests.get(url, params=params, timeout=10)
+            data = response.json()
+
+            if not data.get('results'):
+                print(f"[AI Service] No {category} found nearby")
+                return None
+
+            place = data['results'][0]  # Get nearest
+
+            # Get place details for phone number and opening hours
+            place_id = place.get('place_id')
+            details = self._get_place_details(place_id) if place_id else {}
+
+            # Calculate distance
+            place_lat = place['geometry']['location']['lat']
+            place_lng = place['geometry']['location']['lng']
+            distance_km = self._calculate_distance(latitude, longitude, place_lat, place_lng)
+
+            # Format distance
+            if distance_km < 1:
+                distance_text = f"{int(distance_km * 1000)} m"
+            else:
+                distance_text = f"{distance_km:.1f} km"
+
+            result = {
+                'name': place.get('name'),
+                'category': category,
+                'address': place.get('vicinity', ''),
+                'phone': details.get('formatted_phone_number', ''),
+                'opening_hours': self._format_opening_hours(details.get('opening_hours', {})),
+                'distance': distance_text,
+                'latitude': place_lat,
+                'longitude': place_lng
+            }
+
+            print(f"[AI Service] Found {category}: {place.get('name')} ({distance_text})")
+            return result
+
+        except Exception as e:
+            print(f"[AI Service] Error finding {category}: {e}")
+            return None

@@ -1,0 +1,959 @@
+{% extends "base.html" %}
+
+{% block title %}Calendrier - LocApp{% endblock %}
+
+{% block extra_head %}
+<style>
+    .calendar-container {
+        display: grid;
+        grid-template-columns: 350px 1fr;
+        gap: 2rem;
+        margin-top: 1rem;
+    }
+
+    @media (max-width: 1024px) {
+        .calendar-container {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Sources Panel */
+    .sources-panel {
+        background: var(--card-bg);
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: var(--shadow);
+    }
+
+    .sources-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .sources-header h3 {
+        margin: 0;
+        font-size: 1.1rem;
+    }
+
+    .source-card {
+        background: rgba(0, 0, 0, 0.02);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .source-card.syncing {
+        opacity: 0.7;
+    }
+
+    .source-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 0.5rem;
+    }
+
+    .source-name {
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+
+    .source-platform {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        background: var(--primary-light);
+        color: var(--primary-color);
+    }
+
+    .source-status {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.5rem;
+    }
+
+    .source-status.success { color: #10b981; }
+    .source-status.error { color: #ef4444; }
+    .source-status.pending { color: #f59e0b; }
+
+    .source-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+    }
+
+    .btn-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        border: 1px solid var(--border-color);
+        background: white;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-icon:hover {
+        background: var(--primary-light);
+        border-color: var(--primary-color);
+    }
+
+    .btn-icon.danger:hover {
+        background: #fee2e2;
+        border-color: #ef4444;
+    }
+
+    /* Add Source Form */
+    .add-source-form {
+        background: rgba(var(--primary-rgb), 0.05);
+        border: 1px dashed var(--primary-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+
+    .add-source-form.hidden {
+        display: none;
+    }
+
+    .form-row {
+        margin-bottom: 0.75rem;
+    }
+
+    .form-row label {
+        display: block;
+        font-size: 0.85rem;
+        font-weight: 500;
+        margin-bottom: 0.25rem;
+        color: var(--text-secondary);
+    }
+
+    .form-row input, .form-row select {
+        width: 100%;
+        padding: 0.6rem;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        font-size: 0.9rem;
+    }
+
+    .form-row input:focus, .form-row select:focus {
+        outline: none;
+        border-color: var(--primary-color);
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 1rem;
+    }
+
+    /* Calendar Panel */
+    .calendar-panel {
+        background: var(--card-bg);
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: var(--shadow);
+    }
+
+    .calendar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .calendar-nav {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .calendar-nav button {
+        background: none;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 0.5rem 0.75rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .calendar-nav button:hover {
+        background: var(--primary-light);
+        border-color: var(--primary-color);
+    }
+
+    .calendar-month {
+        font-size: 1.25rem;
+        font-weight: 600;
+    }
+
+    .calendar-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    /* Calendar Grid */
+    .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 1px;
+        background: var(--border-color);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .calendar-day-header {
+        background: var(--primary-light);
+        padding: 0.75rem;
+        text-align: center;
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: var(--primary-color);
+    }
+
+    .calendar-day {
+        background: white;
+        min-height: 80px;
+        padding: 0.5rem;
+        position: relative;
+    }
+
+    .calendar-day.other-month {
+        background: #f9fafb;
+        color: #9ca3af;
+    }
+
+    .calendar-day.today {
+        background: rgba(var(--primary-rgb), 0.1);
+    }
+
+    .day-number {
+        font-weight: 500;
+        font-size: 0.9rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .day-events {
+        font-size: 0.75rem;
+    }
+
+    .event-badge {
+        display: block;
+        padding: 0.2rem 0.4rem;
+        border-radius: 4px;
+        margin-bottom: 0.2rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        cursor: pointer;
+    }
+
+    .event-badge.airbnb {
+        background: #ff5a5f;
+        color: white;
+    }
+
+    .event-badge.booking {
+        background: #003580;
+        color: white;
+    }
+
+    .event-badge.vrbo {
+        background: #0077cc;
+        color: white;
+    }
+
+    .event-badge.manual {
+        background: #6b7280;
+        color: white;
+    }
+
+    .event-badge.other {
+        background: var(--primary-color);
+        color: white;
+    }
+
+    /* Export Section */
+    .export-section {
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .export-section h4 {
+        margin-bottom: 0.75rem;
+        font-size: 1rem;
+    }
+
+    .export-url {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .export-url input {
+        flex: 1;
+        padding: 0.6rem;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-family: monospace;
+        background: #f9fafb;
+    }
+
+    .help-text {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        line-height: 1.5;
+    }
+
+    /* Modal */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+
+    .modal-overlay.hidden {
+        display: none;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        max-width: 500px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .modal-header h3 {
+        margin: 0;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: var(--text-secondary);
+    }
+
+    /* Legend */
+    .calendar-legend {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.8rem;
+    }
+
+    .legend-color {
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+    }
+
+    /* Loading spinner */
+    .spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid #f3f3f3;
+        border-top: 2px solid var(--primary-color);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Calendrier</h1>
+    <p class="page-subtitle">Synchronisez vos calendriers Booking.com, Airbnb et autres plateformes</p>
+</div>
+
+<div class="calendar-container">
+    <!-- Sources Panel -->
+    <div class="sources-panel">
+        <div class="sources-header">
+            <h3>Sources de calendrier</h3>
+            <button class="btn btn-sm btn-primary" onclick="toggleAddForm()">+ Ajouter</button>
+        </div>
+
+        <!-- Add Source Form -->
+        <div id="addSourceForm" class="add-source-form hidden">
+            <div class="form-row">
+                <label for="sourceName">Nom de la source</label>
+                <select id="sourceName" onchange="handleSourceSelect(this)">
+                    <option value="">Choisir une plateforme...</option>
+                    <option value="Airbnb">Airbnb</option>
+                    <option value="Booking.com">Booking.com</option>
+                    <option value="VRBO">VRBO / Abritel</option>
+                    <option value="custom">Autre (personnalise)</option>
+                </select>
+            </div>
+            <div id="customNameRow" class="form-row hidden">
+                <label for="customName">Nom personnalise</label>
+                <input type="text" id="customName" placeholder="Ex: HomeAway">
+            </div>
+            <div class="form-row">
+                <label for="icalUrl">URL du calendrier iCal</label>
+                <input type="url" id="icalUrl" placeholder="https://...">
+            </div>
+            <div class="help-text" style="margin-bottom: 1rem;">
+                <strong>Ou trouver l'URL iCal ?</strong><br>
+                - Airbnb : Annonce > Calendrier > Disponibilites > Exporter le calendrier<br>
+                - Booking : Extranet > Calendrier > Sync Calendrier
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-secondary" onclick="toggleAddForm()">Annuler</button>
+                <button class="btn btn-primary" onclick="addCalendarSource()">Ajouter</button>
+            </div>
+        </div>
+
+        <!-- Sources List -->
+        <div id="sourcesList">
+            <p class="help-text" style="text-align: center; padding: 2rem;">
+                Chargement des sources...
+            </p>
+        </div>
+
+        <!-- Export Section -->
+        <div class="export-section">
+            <h4>Exporter votre calendrier</h4>
+            <p class="help-text" style="margin-bottom: 0.75rem;">
+                Partagez ce lien iCal avec d'autres plateformes pour synchroniser vos disponibilites.
+            </p>
+            <div class="export-url">
+                <input type="text" id="exportUrl" readonly value="">
+                <button class="btn btn-secondary" onclick="copyExportUrl()">Copier</button>
+            </div>
+            <a id="downloadIcal" href="#" class="btn btn-primary" style="display: inline-block;">
+                Telecharger .ics
+            </a>
+        </div>
+    </div>
+
+    <!-- Calendar Panel -->
+    <div class="calendar-panel">
+        <div class="calendar-header">
+            <div class="calendar-nav">
+                <button onclick="changeMonth(-1)">&lt; Precedent</button>
+                <span id="currentMonth" class="calendar-month">Janvier 2024</span>
+                <button onclick="changeMonth(1)">Suivant &gt;</button>
+            </div>
+            <div class="calendar-actions">
+                <button class="btn btn-secondary" onclick="syncAllSources()">
+                    <span id="syncIcon">Synchroniser</span>
+                </button>
+                <button class="btn btn-primary" onclick="openBlockModal()">+ Bloquer des dates</button>
+            </div>
+        </div>
+
+        <div id="calendarGrid" class="calendar-grid">
+            <!-- Generated by JavaScript -->
+        </div>
+
+        <div class="calendar-legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background: #ff5a5f;"></div>
+                <span>Airbnb</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #003580;"></div>
+                <span>Booking.com</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #0077cc;"></div>
+                <span>VRBO</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #6b7280;"></div>
+                <span>Manuel</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Block Dates Modal -->
+<div id="blockModal" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Bloquer des dates</h3>
+            <button class="modal-close" onclick="closeBlockModal()">&times;</button>
+        </div>
+        <div class="form-row">
+            <label for="blockStart">Date de debut</label>
+            <input type="date" id="blockStart">
+        </div>
+        <div class="form-row">
+            <label for="blockEnd">Date de fin</label>
+            <input type="date" id="blockEnd">
+        </div>
+        <div class="form-row">
+            <label for="blockReason">Raison (optionnel)</label>
+            <input type="text" id="blockReason" placeholder="Ex: Travaux, vacances proprietaire...">
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-secondary" onclick="closeBlockModal()">Annuler</button>
+            <button class="btn btn-primary" onclick="blockDates()">Bloquer</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentPropertyId = null;
+    let currentDate = new Date();
+    let calendarEvents = [];
+    let calendarSources = [];
+
+    const MONTHS_FR = ['Janvier', 'Fevrier', 'Mars', 'Avril', 'Mai', 'Juin',
+                       'Juillet', 'Aout', 'Septembre', 'Octobre', 'Novembre', 'Decembre'];
+    const DAYS_FR = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Get current property from selector
+        const propertySelector = document.getElementById('property-selector');
+        if (propertySelector) {
+            currentPropertyId = parseInt(propertySelector.value);
+            updateExportUrls();
+            loadCalendarData();
+        }
+    });
+
+    function updateExportUrls() {
+        if (!currentPropertyId) return;
+        const baseUrl = window.location.origin;
+        const exportUrl = `${baseUrl}/api/properties/${currentPropertyId}/calendar/export.ics`;
+        document.getElementById('exportUrl').value = exportUrl;
+        document.getElementById('downloadIcal').href = exportUrl;
+    }
+
+    async function loadCalendarData() {
+        if (!currentPropertyId) return;
+
+        // Load sources
+        await loadSources();
+
+        // Load events for current month
+        await loadEvents();
+
+        // Render calendar
+        renderCalendar();
+    }
+
+    async function loadSources() {
+        try {
+            const response = await fetch(`/api/properties/${currentPropertyId}/calendar/sources`);
+            const data = await response.json();
+            calendarSources = data.sources || [];
+            renderSources();
+        } catch (error) {
+            console.error('Error loading sources:', error);
+        }
+    }
+
+    function renderSources() {
+        const container = document.getElementById('sourcesList');
+
+        if (calendarSources.length === 0) {
+            container.innerHTML = `
+                <p class="help-text" style="text-align: center; padding: 2rem;">
+                    Aucune source de calendrier.<br>
+                    Ajoutez vos calendriers Airbnb ou Booking.com pour synchroniser vos reservations.
+                </p>
+            `;
+            return;
+        }
+
+        container.innerHTML = calendarSources.map(source => `
+            <div class="source-card" id="source-${source.id}">
+                <div class="source-header">
+                    <div>
+                        <span class="source-name">${source.source_name}</span>
+                        <span class="source-platform">${getPlatformIcon(source.source_name)} ${source.source_type}</span>
+                    </div>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="checkbox" ${source.is_active ? 'checked' : ''}
+                               onchange="toggleSource(${source.id}, this.checked)">
+                        Actif
+                    </label>
+                </div>
+                <div class="source-status ${source.sync_status}">
+                    ${getStatusText(source)}
+                </div>
+                <div class="source-actions">
+                    <button class="btn-icon" onclick="syncSource(${source.id})" title="Synchroniser">
+                        <span id="sync-icon-${source.id}">Sync</span>
+                    </button>
+                    <button class="btn-icon danger" onclick="deleteSource(${source.id})" title="Supprimer">
+                        X
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function getPlatformIcon(name) {
+        name = name.toLowerCase();
+        if (name.includes('airbnb')) return 'A';
+        if (name.includes('booking')) return 'B';
+        if (name.includes('vrbo') || name.includes('abritel')) return 'V';
+        return 'C';
+    }
+
+    function getStatusText(source) {
+        if (source.sync_status === 'success') {
+            const lastSync = source.last_sync ? new Date(source.last_sync).toLocaleString('fr-FR') : '';
+            return `Derniere sync: ${lastSync}`;
+        } else if (source.sync_status === 'error') {
+            return `Erreur: ${source.sync_error || 'Inconnue'}`;
+        }
+        return 'En attente de synchronisation';
+    }
+
+    async function loadEvents() {
+        try {
+            // Get date range for current month view
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const start = new Date(year, month, 1);
+            const end = new Date(year, month + 1, 0);
+
+            const params = new URLSearchParams({
+                start: start.toISOString().split('T')[0],
+                end: end.toISOString().split('T')[0]
+            });
+
+            const response = await fetch(`/api/properties/${currentPropertyId}/calendar/events?${params}`);
+            const data = await response.json();
+            calendarEvents = data.events || [];
+        } catch (error) {
+            console.error('Error loading events:', error);
+            calendarEvents = [];
+        }
+    }
+
+    function renderCalendar() {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+
+        // Update month display
+        document.getElementById('currentMonth').textContent = `${MONTHS_FR[month]} ${year}`;
+
+        // Get first day of month and number of days
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const daysInMonth = lastDay.getDate();
+
+        // Adjust for Monday start (0 = Monday, 6 = Sunday)
+        let startDayOfWeek = firstDay.getDay() - 1;
+        if (startDayOfWeek < 0) startDayOfWeek = 6;
+
+        let html = '';
+
+        // Day headers
+        DAYS_FR.forEach(day => {
+            html += `<div class="calendar-day-header">${day}</div>`;
+        });
+
+        // Previous month days
+        const prevMonthDays = new Date(year, month, 0).getDate();
+        for (let i = startDayOfWeek - 1; i >= 0; i--) {
+            const dayNum = prevMonthDays - i;
+            html += `<div class="calendar-day other-month"><span class="day-number">${dayNum}</span></div>`;
+        }
+
+        // Current month days
+        const today = new Date();
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
+
+            const dayEvents = calendarEvents.filter(e => {
+                const start = e.start_date;
+                const end = e.end_date;
+                return dateStr >= start && dateStr < end;
+            });
+
+            html += `<div class="calendar-day ${isToday ? 'today' : ''}">
+                <span class="day-number">${day}</span>
+                <div class="day-events">
+                    ${dayEvents.slice(0, 2).map(e => `
+                        <span class="event-badge ${getPlatformClass(e.platform)}" title="${e.summary || ''} - ${e.guest_name || 'Reserve'}">
+                            ${e.guest_name || e.platform || 'Reserve'}
+                        </span>
+                    `).join('')}
+                    ${dayEvents.length > 2 ? `<span class="event-badge other">+${dayEvents.length - 2}</span>` : ''}
+                </div>
+            </div>`;
+        }
+
+        // Next month days
+        const totalCells = Math.ceil((startDayOfWeek + daysInMonth) / 7) * 7;
+        const nextMonthDays = totalCells - startDayOfWeek - daysInMonth;
+        for (let day = 1; day <= nextMonthDays; day++) {
+            html += `<div class="calendar-day other-month"><span class="day-number">${day}</span></div>`;
+        }
+
+        document.getElementById('calendarGrid').innerHTML = html;
+    }
+
+    function getPlatformClass(platform) {
+        if (!platform) return 'other';
+        const p = platform.toLowerCase();
+        if (p.includes('airbnb')) return 'airbnb';
+        if (p.includes('booking')) return 'booking';
+        if (p.includes('vrbo') || p.includes('abritel')) return 'vrbo';
+        if (p.includes('manuel')) return 'manual';
+        return 'other';
+    }
+
+    function changeMonth(delta) {
+        currentDate.setMonth(currentDate.getMonth() + delta);
+        loadEvents().then(() => renderCalendar());
+    }
+
+    // Sources management
+    function toggleAddForm() {
+        const form = document.getElementById('addSourceForm');
+        form.classList.toggle('hidden');
+    }
+
+    function handleSourceSelect(select) {
+        const customRow = document.getElementById('customNameRow');
+        if (select.value === 'custom') {
+            customRow.classList.remove('hidden');
+        } else {
+            customRow.classList.add('hidden');
+        }
+    }
+
+    async function addCalendarSource() {
+        const sourceSelect = document.getElementById('sourceName');
+        let sourceName = sourceSelect.value;
+
+        if (sourceName === 'custom') {
+            sourceName = document.getElementById('customName').value.trim();
+        }
+
+        const icalUrl = document.getElementById('icalUrl').value.trim();
+
+        if (!sourceName || !icalUrl) {
+            alert('Veuillez remplir tous les champs');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/properties/${currentPropertyId}/calendar/sources`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ source_name: sourceName, ical_url: icalUrl })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                toggleAddForm();
+                sourceSelect.value = '';
+                document.getElementById('customName').value = '';
+                document.getElementById('icalUrl').value = '';
+                await loadCalendarData();
+
+                if (data.sync_error) {
+                    alert(`Source ajoutee mais erreur de sync: ${data.sync_error}`);
+                }
+            } else {
+                alert(data.error || 'Erreur lors de l\'ajout');
+            }
+        } catch (error) {
+            alert('Erreur de connexion');
+        }
+    }
+
+    async function syncSource(sourceId) {
+        const iconSpan = document.getElementById(`sync-icon-${sourceId}`);
+        iconSpan.innerHTML = '<span class="spinner"></span>';
+
+        try {
+            const response = await fetch(`/api/properties/${currentPropertyId}/calendar/sources/${sourceId}/sync`, {
+                method: 'POST'
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                await loadCalendarData();
+            } else {
+                alert(data.error || 'Erreur de synchronisation');
+            }
+        } catch (error) {
+            alert('Erreur de connexion');
+        }
+
+        iconSpan.textContent = 'Sync';
+    }
+
+    async function syncAllSources() {
+        const syncBtn = document.getElementById('syncIcon');
+        syncBtn.innerHTML = '<span class="spinner"></span> Sync...';
+
+        try {
+            const response = await fetch(`/api/properties/${currentPropertyId}/calendar/sync-all`, {
+                method: 'POST'
+            });
+
+            await loadCalendarData();
+        } catch (error) {
+            alert('Erreur de synchronisation');
+        }
+
+        syncBtn.textContent = 'Synchroniser';
+    }
+
+    async function toggleSource(sourceId, isActive) {
+        try {
+            await fetch(`/api/properties/${currentPropertyId}/calendar/sources/${sourceId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_active: isActive })
+            });
+        } catch (error) {
+            console.error('Error toggling source:', error);
+        }
+    }
+
+    async function deleteSource(sourceId) {
+        if (!confirm('Supprimer cette source de calendrier ?')) return;
+
+        try {
+            const response = await fetch(`/api/properties/${currentPropertyId}/calendar/sources/${sourceId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                await loadCalendarData();
+            }
+        } catch (error) {
+            alert('Erreur de suppression');
+        }
+    }
+
+    // Block dates modal
+    function openBlockModal() {
+        document.getElementById('blockModal').classList.remove('hidden');
+        // Set default dates
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('blockStart').value = today;
+        document.getElementById('blockEnd').value = today;
+    }
+
+    function closeBlockModal() {
+        document.getElementById('blockModal').classList.add('hidden');
+    }
+
+    async function blockDates() {
+        const startDate = document.getElementById('blockStart').value;
+        const endDate = document.getElementById('blockEnd').value;
+        const reason = document.getElementById('blockReason').value.trim();
+
+        if (!startDate || !endDate) {
+            alert('Veuillez selectionner les dates');
+            return;
+        }
+
+        if (startDate > endDate) {
+            alert('La date de debut doit etre avant la date de fin');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/properties/${currentPropertyId}/calendar/events`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    start_date: startDate,
+                    end_date: endDate,
+                    summary: reason || 'Bloque manuellement',
+                    platform: 'Manuel'
+                })
+            });
+
+            if (response.ok) {
+                closeBlockModal();
+                await loadCalendarData();
+            } else {
+                const data = await response.json();
+                alert(data.error || 'Erreur lors du blocage');
+            }
+        } catch (error) {
+            alert('Erreur de connexion');
+        }
+    }
+
+    function copyExportUrl() {
+        const input = document.getElementById('exportUrl');
+        input.select();
+        document.execCommand('copy');
+        alert('URL copiee !');
+    }
+
+    // Re-load data when property changes
+    const propertySelector = document.getElementById('property-selector');
+    if (propertySelector) {
+        const originalHandler = propertySelector.onchange;
+        propertySelector.addEventListener('change', function() {
+            currentPropertyId = parseInt(this.value);
+            if (currentPropertyId && this.value !== 'new') {
+                updateExportUrls();
+                loadCalendarData();
+            }
+        });
+    }
+</script>
+{% endblock %}

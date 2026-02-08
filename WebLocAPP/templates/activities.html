@@ -177,6 +177,33 @@
         padding: 0.35rem 0.5rem;
         font-size: 0.85rem;
     }
+    .btn-ai-icon {
+        background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+        border: none;
+        color: white;
+        padding: 0.35rem 0.5rem;
+        font-size: 0.85rem;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .btn-ai-icon:hover:not(:disabled) {
+        background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
+        transform: scale(1.05);
+    }
+    .btn-ai-icon.loading {
+        pointer-events: none;
+        opacity: 0.7;
+    }
+    .btn-ai-icon .spinner-small {
+        width: 12px;
+        height: 12px;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        display: inline-block;
+    }
     .add-activity-btn {
         display: flex;
         align-items: center;
@@ -505,6 +532,11 @@ function renderSections() {
 }
 
 function renderActivityItem(activity) {
+    const hasAiAccess = {{ 'true' if has_ai_access else 'false' }};
+    const aiButton = hasAiAccess
+        ? `<button class="btn btn-sm btn-icon btn-ai-icon" onclick="regenerateActivity(${activity.id})" title="Régénérer avec l'IA">✨</button>`
+        : `<button class="btn btn-sm btn-icon btn-ai-icon" disabled title="Fonctionnalité réservée aux abonnés" style="opacity: 0.4; cursor: not-allowed;">✨</button>`;
+
     return `
         <div class="activity-item" data-activity-id="${activity.id}" draggable="true">
             <span class="activity-drag-handle">⋮⋮</span>
@@ -515,6 +547,7 @@ function renderActivityItem(activity) {
             </div>
             ${activity.distance ? `<span class="activity-distance">${activity.distance}</span>` : ''}
             <div class="activity-actions">
+                ${aiButton}
                 <button class="btn btn-sm btn-icon btn-secondary" onclick="editActivity(${activity.id})" title="Modifier">✏️</button>
                 <button class="btn btn-sm btn-icon btn-danger" onclick="deleteActivity(${activity.id})" title="Supprimer">🗑️</button>
             </div>
@@ -914,6 +947,62 @@ async function regenerateWithAI() {
         showAlert('Erreur de connexion', 'error');
     } finally {
         btn.disabled = false;
+        btn.innerHTML = originalContent;
+    }
+}
+
+// Single activity regeneration
+async function regenerateActivity(activityId) {
+    const activityItem = document.querySelector(`.activity-item[data-activity-id="${activityId}"]`);
+    if (!activityItem) return;
+
+    const btn = activityItem.querySelector('.btn-ai-icon');
+    if (!btn || btn.classList.contains('loading')) return;
+
+    const originalContent = btn.innerHTML;
+    btn.classList.add('loading');
+    btn.innerHTML = '<span class="spinner-small"></span>';
+
+    try {
+        const response = await fetch(`/api/ai/regenerate/activity/${activityId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Property-ID': localStorage.getItem('locapp_current_property')
+            }
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.activity) {
+            // Update the activity in our local array
+            const idx = activities.findIndex(a => a.id === activityId);
+            if (idx !== -1) {
+                activities[idx] = { ...activities[idx], ...result.activity };
+            }
+
+            // Update only this activity item in the DOM (keep sections expanded)
+            const updatedActivity = activities[idx];
+            const emojiEl = activityItem.querySelector('.activity-emoji');
+            const nameEl = activityItem.querySelector('.activity-name');
+            const descEl = activityItem.querySelector('.activity-desc');
+
+            if (emojiEl) emojiEl.textContent = updatedActivity.emoji || '📍';
+            if (nameEl) nameEl.textContent = updatedActivity.name;
+            if (descEl) descEl.textContent = updatedActivity.description || '';
+
+            // Update only the preview
+            updatePreview();
+
+            showAlert('Activité régénérée avec succès !', 'success');
+        } else {
+            showAlert(result.error || 'Erreur lors de la régénération', 'error');
+        }
+    } catch (error) {
+        showAlert('Erreur de connexion', 'error');
+    } finally {
+        // Reset button state
+        btn.classList.remove('loading');
         btn.innerHTML = originalContent;
     }
 }

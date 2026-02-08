@@ -7,186 +7,343 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/commercial.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         body {
             background: #1a1a2e;
             color: #eee;
-            font-family: 'Inter', monospace;
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
         }
-        .superadmin-container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-        .superadmin-header {
+
+        /* Layout */
+        .superadmin-layout {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid #333;
+            min-height: 100vh;
         }
-        .superadmin-header h1 {
+
+        /* Sidebar */
+        .superadmin-sidebar {
+            width: 280px;
+            background: #0d1117;
+            border-right: 1px solid #21262d;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #21262d;
+        }
+
+        .sidebar-header h1 {
             color: #e94560;
-            font-size: 1.5rem;
+            font-size: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
-        .superadmin-header .logout-btn {
+
+        .sidebar-user {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #21262d;
+            font-size: 0.8rem;
+            color: #8b949e;
+        }
+
+        .sidebar-user strong {
+            color: #e94560;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 1rem 0;
+        }
+
+        .nav-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .nav-section-title {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #8b949e;
+            padding: 0.5rem 1.5rem;
+            font-weight: 600;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1.5rem;
+            color: #c9d1d9;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-item:hover {
+            background: rgba(233, 69, 96, 0.1);
+            color: #e94560;
+        }
+
+        .nav-item.active {
+            background: rgba(233, 69, 96, 0.15);
+            color: #e94560;
+            border-left-color: #e94560;
+        }
+
+        .nav-item-icon {
+            font-size: 1.1rem;
+            width: 24px;
+            text-align: center;
+        }
+
+        .nav-item-badge {
+            margin-left: auto;
             background: #e94560;
             color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
-            text-decoration: none;
-            font-size: 0.875rem;
+            font-size: 0.7rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 10px;
         }
+
+        .sidebar-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid #21262d;
+        }
+
+        .sidebar-footer a {
+            display: block;
+            text-align: center;
+            padding: 0.75rem;
+            background: #e94560;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .sidebar-footer a:hover {
+            background: #c73e54;
+        }
+
+        /* Main Content */
+        .superadmin-main {
+            flex: 1;
+            margin-left: 280px;
+            padding: 2rem;
+            background: #1a1a2e;
+        }
+
+        .main-header {
+            margin-bottom: 2rem;
+        }
+
+        .main-header h2 {
+            color: #e94560;
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .main-header p {
+            color: #8b949e;
+            font-size: 0.9rem;
+        }
+
+        /* Stats Grid */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 1rem;
             margin-bottom: 2rem;
         }
+
         .stat-card {
             background: #16213e;
-            padding: 1.5rem;
+            padding: 1.25rem;
             border-radius: 12px;
             border: 1px solid #0f3460;
         }
+
         .stat-card h3 {
             color: #e94560;
             font-size: 2rem;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.25rem;
         }
+
         .stat-card p {
-            color: #888;
-            font-size: 0.875rem;
+            color: #8b949e;
+            font-size: 0.8rem;
         }
+
+        .stat-card.success { border-color: #10b981; }
+        .stat-card.success h3 { color: #10b981; }
+
+        /* Section Panel */
+        .section-panel {
+            display: none;
+        }
+
+        .section-panel.active {
+            display: block;
+        }
+
         .section {
             background: #16213e;
             border-radius: 12px;
             padding: 1.5rem;
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
             border: 1px solid #0f3460;
         }
+
         .section-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 1rem;
         }
-        .section h2 {
+
+        .section h3 {
             color: #e94560;
-            font-size: 1.25rem;
+            font-size: 1.1rem;
         }
+
+        /* Tables */
         .data-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.875rem;
+            font-size: 0.85rem;
         }
+
         .data-table th, .data-table td {
             padding: 0.75rem;
             text-align: left;
             border-bottom: 1px solid #0f3460;
         }
+
         .data-table th {
             background: #0f3460;
             color: #e94560;
             font-weight: 600;
         }
+
         .data-table tr:hover {
-            background: rgba(233, 69, 96, 0.1);
+            background: rgba(233, 69, 96, 0.05);
         }
+
+        /* Buttons */
         .btn {
             padding: 0.5rem 1rem;
             border-radius: 6px;
             border: none;
             cursor: pointer;
-            font-size: 0.875rem;
+            font-size: 0.85rem;
+            font-weight: 500;
             transition: all 0.2s;
         }
-        .btn-danger {
-            background: #e94560;
-            color: white;
-        }
-        .btn-danger:hover {
-            background: #c73e54;
-        }
+
         .btn-primary {
             background: #0f3460;
             color: white;
         }
+
         .btn-primary:hover {
             background: #1a4a7a;
         }
+
+        .btn-danger {
+            background: #e94560;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c73e54;
+        }
+
+        .btn-secondary {
+            background: #333;
+            color: #ccc;
+        }
+
+        .btn-secondary:hover {
+            background: #444;
+        }
+
         .btn-sm {
             padding: 0.25rem 0.5rem;
             font-size: 0.75rem;
         }
+
         .actions {
             display: flex;
             gap: 0.5rem;
         }
-        .alert {
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-        }
-        .alert-success {
-            background: rgba(16, 185, 129, 0.2);
-            border: 1px solid #10b981;
-            color: #10b981;
-        }
-        .alert-error {
-            background: rgba(233, 69, 96, 0.2);
-            border: 1px solid #e94560;
-            color: #e94560;
-        }
+
+        /* Badges */
         .badge {
             padding: 0.25rem 0.5rem;
             border-radius: 4px;
             font-size: 0.75rem;
         }
+
         .badge-active {
             background: rgba(16, 185, 129, 0.2);
             color: #10b981;
         }
+
         .badge-inactive {
             background: rgba(239, 68, 68, 0.2);
             color: #ef4444;
         }
-        .sql-console {
-            background: #0d1117;
+
+        /* Alerts */
+        #alert-container {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .alert {
+            padding: 1rem 1.5rem;
             border-radius: 8px;
-            padding: 1rem;
+            animation: slideIn 0.3s ease;
         }
-        .sql-console textarea {
-            width: 100%;
-            background: transparent;
-            border: none;
-            color: #58a6ff;
-            font-family: 'Courier New', monospace;
-            font-size: 0.875rem;
-            resize: vertical;
-            min-height: 100px;
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
         }
-        .sql-console textarea:focus {
-            outline: none;
+
+        .alert-success {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid #10b981;
+            color: #10b981;
         }
-        .sql-results {
-            margin-top: 1rem;
-            max-height: 300px;
-            overflow-y: auto;
+
+        .alert-error {
+            background: rgba(233, 69, 96, 0.2);
+            border: 1px solid #e94560;
+            color: #e94560;
         }
-        .sql-results pre {
-            color: #8b949e;
-            font-size: 0.75rem;
-            white-space: pre-wrap;
-        }
-        .warning-box {
-            background: rgba(245, 158, 11, 0.2);
-            border: 1px solid #f59e0b;
-            color: #f59e0b;
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-        }
+
+        /* Forms */
         .env-input {
             width: 100%;
             padding: 0.75rem;
@@ -195,384 +352,103 @@
             border-radius: 6px;
             color: #58a6ff;
             font-family: 'Courier New', monospace;
-            font-size: 0.875rem;
+            font-size: 0.85rem;
         }
+
         .env-input:focus {
             outline: none;
             border-color: #e94560;
         }
-    </style>
-</head>
-<body>
-    <div class="superadmin-container">
-        <div class="superadmin-header">
-            <h1>🔧 SuperAdmin - Database Management</h1>
-            <div>
-                <span style="color: #888; margin-right: 1rem;">Connecté en tant que: <strong style="color: #e94560;">{{ admin_user }}</strong></span>
-                <a href="{{ url_for('superadmin_logout') }}" class="logout-btn">Déconnexion</a>
-            </div>
-        </div>
 
-        <div id="alert-container"></div>
+        .form-group {
+            margin-bottom: 1rem;
+        }
 
-        <!-- Stats -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h3>{{ stats.users }}</h3>
-                <p>Utilisateurs</p>
-            </div>
-            <div class="stat-card">
-                <h3>{{ stats.properties }}</h3>
-                <p>Propriétés</p>
-            </div>
-            <div class="stat-card">
-                <h3>{{ stats.activities }}</h3>
-                <p>Activités</p>
-            </div>
-            <div class="stat-card">
-                <h3>{{ stats.services }}</h3>
-                <p>Services</p>
-            </div>
-            <div class="stat-card" style="border-color: #10b981;">
-                <h3 style="color: #10b981;">{{ stats.active_sessions }}</h3>
-                <p>Sessions actives</p>
-            </div>
-        </div>
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #c9d1d9;
+            font-size: 0.85rem;
+        }
 
-        <!-- Active Sessions Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>🟢 Utilisateurs connectés</h2>
-                <button class="btn btn-primary" onclick="refreshSessions()">Actualiser</button>
-            </div>
-            {% if active_sessions %}
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Utilisateur</th>
-                        <th>Email</th>
-                        <th>Connexion</th>
-                        <th>Dernière activité</th>
-                        <th>Navigateur</th>
-                        <th>IP</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="sessions-table">
-                    {% for sess in active_sessions %}
-                    <tr>
-                        <td><strong>{{ sess.firstname }} {{ sess.lastname }}</strong></td>
-                        <td>{{ sess.email }}</td>
-                        <td>{{ sess.login_time[:19] if sess.login_time else '-' }}</td>
-                        <td>{{ sess.last_activity[:19] if sess.last_activity else '-' }}</td>
-                        <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ sess.user_agent }}">{{ sess.user_agent[:50] }}{% if sess.user_agent|length > 50 %}...{% endif %}</td>
-                        <td>{{ sess.ip_address }}</td>
-                        <td class="actions">
-                            <button class="btn btn-danger btn-sm" onclick="disconnectSession('{{ sess.token_preview }}', '{{ sess.email }}')">Déconnecter</button>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <p style="color: #888; text-align: center; padding: 2rem;">Aucun utilisateur connecté actuellement</p>
-            {% endif %}
-        </div>
+        .form-group small {
+            display: block;
+            margin-top: 0.25rem;
+            color: #8b949e;
+            font-size: 0.75rem;
+        }
 
-        <!-- Users Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>👥 Utilisateurs</h2>
-                <button class="btn btn-primary" onclick="refreshData()">Actualiser</button>
-            </div>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Email</th>
-                        <th>Prénom</th>
-                        <th>Nom</th>
-                        <th>Mot de passe</th>
-                        <th>Google ID</th>
-                        <th>Créé le</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="users-table">
-                    {% for user in users %}
-                    <tr>
-                        <td>{{ user.id }}</td>
-                        <td>{{ user.email }}</td>
-                        <td>{{ user.firstname }}</td>
-                        <td>{{ user.lastname }}</td>
-                        <td>
-                            {% if user.password_plain %}
-                            <code style="background: #0d1117; padding: 2px 6px; border-radius: 4px; cursor: pointer;" onclick="copyToClipboard('{{ user.password_plain }}')" title="Cliquer pour copier">{{ user.password_plain }}</code>
-                            {% elif user.google_id %}
-                            <span style="color: #888; font-style: italic;">Google Auth</span>
-                            {% else %}
-                            <span style="color: #f59e0b;">Non disponible</span>
-                            {% endif %}
-                        </td>
-                        <td>{{ user.google_id or '-' }}</td>
-                        <td>{{ user.created_at }}</td>
-                        <td class="actions">
-                            <button class="btn btn-primary btn-sm" onclick="openResetPasswordModal({{ user.id }}, '{{ user.email }}')">Mot de passe</button>
-                            <button class="btn btn-danger btn-sm" onclick="deleteUser({{ user.id }}, '{{ user.email }}')">Supprimer</button>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+        }
 
-        <!-- Properties Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>🏠 Propriétés</h2>
-            </div>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Icon</th>
-                        <th>Nom</th>
-                        <th>Slug</th>
-                        <th>Propriétaire (user_id)</th>
-                        <th>Thème</th>
-                        <th>Actif</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for prop in properties %}
-                    <tr>
-                        <td>{{ prop.id }}</td>
-                        <td>{{ prop.icon }}</td>
-                        <td>{{ prop.name }}</td>
-                        <td><code>{{ prop.slug }}</code></td>
-                        <td>{{ prop.user_id or '-' }} {% if prop.owner_email %}({{ prop.owner_email }}){% endif %}</td>
-                        <td>{{ prop.theme }}</td>
-                        <td>
-                            {% if prop.is_active %}
-                            <span class="badge badge-active">Actif</span>
-                            {% else %}
-                            <span class="badge badge-inactive">Inactif</span>
-                            {% endif %}
-                        </td>
-                        <td class="actions">
-                            <button class="btn btn-primary btn-sm" onclick="toggleProperty({{ prop.id }})">Toggle</button>
-                            <button class="btn btn-danger btn-sm" onclick="deleteProperty({{ prop.id }}, '{{ prop.name }}')">Supprimer</button>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        /* Warning Box */
+        .warning-box {
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid #f59e0b;
+            color: #f59e0b;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-size: 0.85rem;
+        }
 
-        <!-- SQL Console -->
-        <div class="section">
-            <div class="section-header">
-                <h2>💻 Console SQL (Lecture seule)</h2>
-            </div>
-            <div class="warning-box">
-                ⚠️ Attention: Cette console permet uniquement les requêtes SELECT pour des raisons de sécurité.
-            </div>
-            <div class="sql-console">
-                <textarea id="sql-query" placeholder="SELECT * FROM users LIMIT 10;">SELECT * FROM users LIMIT 10;</textarea>
-                <div style="margin-top: 0.5rem;">
-                    <button class="btn btn-primary" onclick="executeSQL()">Exécuter</button>
-                </div>
-                <div class="sql-results" id="sql-results">
-                    <pre>Résultats de la requête...</pre>
-                </div>
-            </div>
-        </div>
+        /* SQL Console */
+        .sql-console {
+            background: #0d1117;
+            border-radius: 8px;
+            padding: 1rem;
+        }
 
-        <!-- Photo Limits Configuration -->
-        <div class="section">
-            <div class="section-header">
-                <h2>📷 Limites de Photos</h2>
-                <button class="btn btn-primary" onclick="loadPhotoLimits()">Actualiser</button>
-            </div>
-            <p style="color: #888; margin-bottom: 1rem;">
-                Configurez le nombre maximum de photos autorisées pour chaque section de l'application.
-            </p>
-            <form id="photoLimitsForm">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                    <div class="env-field">
-                        <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">📸 Galerie Photos (page Photos)</label>
-                        <input type="number" id="config_max_photos_gallery" class="env-input" min="1" max="100" placeholder="50">
-                        <small style="color: #888; display: block; margin-top: 0.25rem;">Nombre max de photos dans la galerie principale</small>
-                    </div>
-                    <div class="env-field">
-                        <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">🔐 Photos d'Accès (page Accès)</label>
-                        <input type="number" id="config_max_photos_access" class="env-input" min="1" max="20" placeholder="3">
-                        <small style="color: #888; display: block; margin-top: 0.25rem;">Nombre max de photos pour l'aide à l'accès</small>
-                    </div>
-                </div>
-                <div style="margin-top: 1rem;">
-                    <button type="submit" class="btn btn-primary">💾 Enregistrer les limites</button>
-                </div>
-            </form>
-        </div>
+        .sql-console textarea {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: #58a6ff;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            resize: vertical;
+            min-height: 100px;
+        }
 
-        <!-- API Keys Management Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2>🔑 Clés API & Configuration</h2>
-                <button class="btn btn-primary" onclick="loadEnvConfig()">Actualiser</button>
-            </div>
-            <div class="warning-box">
-                ⚠️ Attention: Ces clés sont sensibles. Ne les partagez pas et assurez-vous de les garder confidentielles.
-            </div>
-            <form id="envConfigForm">
-                <div style="display: grid; gap: 1rem;">
-                    <!-- Flask Secret Key -->
-                    <div class="env-field">
-                        <label style="color: #e94560; font-weight: 600; display: block; margin-bottom: 0.5rem;">🔐 SECRET_KEY (Flask)</label>
-                        <input type="text" id="env_secret_key" class="env-input" placeholder="Clé secrète Flask">
-                        <small style="color: #888; display: block; margin-top: 0.25rem;">Clé utilisée pour signer les sessions Flask</small>
-                    </div>
+        .sql-console textarea:focus {
+            outline: none;
+        }
 
-                    <!-- Google OAuth -->
-                    <div style="border-top: 1px solid #0f3460; padding-top: 1rem; margin-top: 0.5rem;">
-                        <h4 style="color: #58a6ff; margin-bottom: 1rem;">🔵 Google OAuth</h4>
-                        <div class="env-field" style="margin-bottom: 1rem;">
-                            <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">GOOGLE_CLIENT_ID</label>
-                            <input type="text" id="env_google_client_id" class="env-input" placeholder="Client ID Google OAuth">
-                        </div>
-                        <div class="env-field">
-                            <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">GOOGLE_CLIENT_SECRET</label>
-                            <input type="text" id="env_google_client_secret" class="env-input" placeholder="Client Secret Google OAuth">
-                        </div>
-                    </div>
+        .sql-results {
+            margin-top: 1rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
 
-                    <!-- Google Maps -->
-                    <div style="border-top: 1px solid #0f3460; padding-top: 1rem; margin-top: 0.5rem;">
-                        <h4 style="color: #10b981; margin-bottom: 1rem;">🗺️ Google Maps</h4>
-                        <div class="env-field">
-                            <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">GOOGLE_MAPS_API_KEY</label>
-                            <input type="text" id="env_google_maps_api_key" class="env-input" placeholder="Clé API Google Maps">
-                        </div>
-                    </div>
+        .sql-results pre {
+            color: #8b949e;
+            font-size: 0.75rem;
+            white-space: pre-wrap;
+        }
 
-                    <!-- OpenAI / ChatGPT -->
-                    <div style="border-top: 1px solid #0f3460; padding-top: 1rem; margin-top: 0.5rem;">
-                        <h4 style="color: #a855f7; margin-bottom: 1rem;">🤖 OpenAI / ChatGPT</h4>
-                        <div class="env-field">
-                            <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">OPENAI_API_KEY</label>
-                            <input type="password" id="env_openai_api_key" class="env-input" placeholder="sk-...">
-                            <small style="color: #888; display: block; margin-top: 0.25rem;">Clé API OpenAI pour la génération de contenu IA</small>
-                        </div>
-                        <div class="env-field" style="margin-top: 1rem;">
-                            <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">OPENAI_MODEL</label>
-                            <select id="env_openai_model" class="env-input">
-                                <option value="gpt-4o-mini">gpt-4o-mini (Rapide & Économique)</option>
-                                <option value="gpt-4o">gpt-4o (Plus puissant)</option>
-                                <option value="gpt-4-turbo">gpt-4-turbo (Contexte large)</option>
-                            </select>
-                            <small style="color: #888; display: block; margin-top: 0.25rem;">Modèle OpenAI à utiliser pour la génération</small>
-                        </div>
-                        <div style="margin-top: 1rem;">
-                            <button type="button" class="btn btn-secondary" onclick="testOpenAIConnection()" style="background: #a855f7;">
-                                🧪 Tester la connexion
-                            </button>
-                            <span id="openai-test-result" style="margin-left: 1rem;"></span>
-                        </div>
-                    </div>
+        /* Info Cards */
+        .info-card {
+            background: #0d1117;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
 
-                    <!-- Email SMTP -->
-                    <div style="border-top: 1px solid #0f3460; padding-top: 1rem; margin-top: 0.5rem;">
-                        <h4 style="color: #f59e0b; margin-bottom: 1rem;">📧 Configuration Email (SMTP)</h4>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                            <div class="env-field">
-                                <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">SMTP_SERVER</label>
-                                <input type="text" id="env_smtp_server" class="env-input" placeholder="smtp.gmail.com">
-                            </div>
-                            <div class="env-field">
-                                <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">SMTP_PORT</label>
-                                <input type="text" id="env_smtp_port" class="env-input" placeholder="587">
-                            </div>
-                        </div>
-                        <div class="env-field" style="margin-top: 1rem;">
-                            <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">SENDER_EMAIL</label>
-                            <input type="email" id="env_sender_email" class="env-input" placeholder="email@example.com">
-                        </div>
-                        <div class="env-field" style="margin-top: 1rem;">
-                            <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">SENDER_PASSWORD (App Password)</label>
-                            <input type="text" id="env_sender_password" class="env-input" placeholder="xxxx xxxx xxxx xxxx">
-                        </div>
-                        <div class="env-field" style="margin-top: 1rem;">
-                            <label style="color: #ccc; display: block; margin-bottom: 0.5rem;">NOTIFICATION_EMAIL</label>
-                            <input type="email" id="env_notification_email" class="env-input" placeholder="admin@example.com">
-                        </div>
-                    </div>
-                </div>
+        .info-card h5 {
+            margin-bottom: 0.5rem;
+        }
 
-                <div style="margin-top: 1.5rem; display: flex; gap: 0.5rem;">
-                    <button type="submit" class="btn btn-primary">💾 Enregistrer les modifications</button>
-                    <button type="button" class="btn btn-secondary" onclick="loadEnvConfig()">Annuler</button>
-                </div>
-            </form>
-        </div>
+        .info-card ul {
+            color: #8b949e;
+            font-size: 0.8rem;
+            line-height: 1.8;
+            margin-left: 1rem;
+        }
 
-        <!-- Database Tables Info -->
-        <div class="section">
-            <div class="section-header">
-                <h2>📋 Tables de la base de données</h2>
-            </div>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Table</th>
-                        <th>Description</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr><td><code>users</code></td><td>Comptes utilisateurs</td></tr>
-                    <tr><td><code>properties</code></td><td>Propriétés/Locations</td></tr>
-                    <tr><td><code>general_info</code></td><td>Informations générales par propriété</td></tr>
-                    <tr><td><code>wifi_config</code></td><td>Configuration WiFi</td></tr>
-                    <tr><td><code>address</code></td><td>Adresses des propriétés</td></tr>
-                    <tr><td><code>parking_info</code></td><td>Informations parking</td></tr>
-                    <tr><td><code>access_info</code></td><td>Instructions d'accès</td></tr>
-                    <tr><td><code>contact_info</code></td><td>Contacts propriétaires</td></tr>
-                    <tr><td><code>activities</code></td><td>Activités à proximité</td></tr>
-                    <tr><td><code>nearby_services</code></td><td>Services à proximité</td></tr>
-                    <tr><td><code>emergency_numbers</code></td><td>Numéros d'urgence</td></tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- Password Reset Modal -->
-    <div id="resetPasswordModal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Réinitialiser le mot de passe</h3>
-                <button class="modal-close" onclick="closeResetPasswordModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p style="margin-bottom: 1rem;">Utilisateur: <strong id="resetPasswordEmail"></strong></p>
-                <div class="form-group">
-                    <label for="newPassword" style="display: block; margin-bottom: 0.5rem; color: #ccc;">Nouveau mot de passe</label>
-                    <input type="password" id="newPassword" class="form-control" placeholder="Minimum 8 caractères" style="width: 100%; padding: 0.75rem; background: #0d1117; border: 1px solid #0f3460; border-radius: 6px; color: #eee;">
-                </div>
-                <div class="form-group" style="margin-top: 1rem;">
-                    <label for="confirmPassword" style="display: block; margin-bottom: 0.5rem; color: #ccc;">Confirmer le mot de passe</label>
-                    <input type="password" id="confirmPassword" class="form-control" placeholder="Confirmer le mot de passe" style="width: 100%; padding: 0.75rem; background: #0d1117; border: 1px solid #0f3460; border-radius: 6px; color: #eee;">
-                </div>
-                <div id="resetPasswordError" style="color: #e94560; margin-top: 0.5rem; display: none;"></div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeResetPasswordModal()">Annuler</button>
-                <button class="btn btn-primary" onclick="submitResetPassword()">Réinitialiser</button>
-            </div>
-        </div>
-    </div>
-
-    <style>
+        /* Modal */
         .modal {
             position: fixed;
             top: 0;
@@ -580,11 +456,16 @@
             width: 100%;
             height: 100%;
             background: rgba(0, 0, 0, 0.7);
-            display: flex;
+            display: none;
             align-items: center;
             justify-content: center;
             z-index: 1000;
         }
+
+        .modal.active {
+            display: flex;
+        }
+
         .modal-content {
             background: #16213e;
             border-radius: 12px;
@@ -592,6 +473,7 @@
             max-width: 450px;
             border: 1px solid #0f3460;
         }
+
         .modal-header {
             display: flex;
             justify-content: space-between;
@@ -599,23 +481,28 @@
             padding: 1rem 1.5rem;
             border-bottom: 1px solid #0f3460;
         }
+
         .modal-header h3 {
             color: #e94560;
             margin: 0;
         }
+
         .modal-close {
             background: none;
             border: none;
-            color: #888;
+            color: #8b949e;
             font-size: 1.5rem;
             cursor: pointer;
         }
+
         .modal-close:hover {
             color: #e94560;
         }
+
         .modal-body {
             padding: 1.5rem;
         }
+
         .modal-footer {
             display: flex;
             justify-content: flex-end;
@@ -623,18 +510,754 @@
             padding: 1rem 1.5rem;
             border-top: 1px solid #0f3460;
         }
-        .btn-secondary {
-            background: #333;
-            color: #ccc;
-        }
-        .btn-secondary:hover {
-            background: #444;
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .superadmin-sidebar {
+                width: 100%;
+                position: relative;
+                height: auto;
+            }
+            .superadmin-main {
+                margin-left: 0;
+            }
+            .superadmin-layout {
+                flex-direction: column;
+            }
         }
     </style>
+</head>
+<body>
+    <div id="alert-container"></div>
+
+    <div class="superadmin-layout">
+        <!-- Sidebar -->
+        <aside class="superadmin-sidebar">
+            <div class="sidebar-header">
+                <h1><span>&#128295;</span> SuperAdmin</h1>
+            </div>
+
+            <div class="sidebar-user">
+                Connecte : <strong>{{ admin_user }}</strong>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">Tableau de bord</div>
+                    <a class="nav-item active" data-section="dashboard">
+                        <span class="nav-item-icon">&#128200;</span>
+                        <span>Vue d'ensemble</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Web (Proprietaires)</div>
+                    <a class="nav-item" data-section="sessions">
+                        <span class="nav-item-icon">&#128994;</span>
+                        <span>Sessions Web</span>
+                        <span class="nav-item-badge">{{ stats.active_sessions }}</span>
+                    </a>
+                    <a class="nav-item" data-section="users">
+                        <span class="nav-item-icon">&#128101;</span>
+                        <span>Utilisateurs Web</span>
+                        <span class="nav-item-badge">{{ stats.users }}</span>
+                    </a>
+                    <a class="nav-item" data-section="properties">
+                        <span class="nav-item-icon">&#127968;</span>
+                        <span>Proprietes</span>
+                        <span class="nav-item-badge">{{ stats.properties }}</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Mobile (Voyageurs)</div>
+                    <a class="nav-item" data-section="mobile-sessions">
+                        <span class="nav-item-icon">&#128241;</span>
+                        <span>Sessions Mobiles</span>
+                        <span class="nav-item-badge">{{ stats.mobile_sessions }}</span>
+                    </a>
+                    <a class="nav-item" data-section="mobile-users">
+                        <span class="nav-item-icon">&#128100;</span>
+                        <span>Utilisateurs Mobiles</span>
+                        <span class="nav-item-badge">{{ stats.mobile_users }}</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Configuration</div>
+                    <a class="nav-item" data-section="api-keys">
+                        <span class="nav-item-icon">&#128273;</span>
+                        <span>Cles API</span>
+                    </a>
+                    <a class="nav-item" data-section="photos">
+                        <span class="nav-item-icon">&#128247;</span>
+                        <span>Limites Photos</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Outils</div>
+                    <a class="nav-item" data-section="sql">
+                        <span class="nav-item-icon">&#128187;</span>
+                        <span>Console SQL</span>
+                    </a>
+                    <a class="nav-item" data-section="database">
+                        <span class="nav-item-icon">&#128451;</span>
+                        <span>Base de donnees</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Roadmap</div>
+                    <a class="nav-item" data-section="roadmap">
+                        <span class="nav-item-icon">&#128197;</span>
+                        <span>Evolution Calendrier</span>
+                    </a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <a href="{{ url_for('superadmin_logout') }}">Deconnexion</a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="superadmin-main">
+            <!-- Dashboard Section -->
+            <div id="section-dashboard" class="section-panel active">
+                <div class="main-header">
+                    <h2>Vue d'ensemble</h2>
+                    <p>Statistiques globales de l'application</p>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>{{ stats.users }}</h3>
+                        <p>Utilisateurs</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>{{ stats.properties }}</h3>
+                        <p>Proprietes</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>{{ stats.activities }}</h3>
+                        <p>Activites</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>{{ stats.services }}</h3>
+                        <p>Services</p>
+                    </div>
+                    <div class="stat-card success">
+                        <h3>{{ stats.active_sessions }}</h3>
+                        <p>Sessions Web</p>
+                    </div>
+                    <div class="stat-card" style="border-color: #a855f7;">
+                        <h3 style="color: #a855f7;">{{ stats.mobile_users }}</h3>
+                        <p>Voyageurs (Mobile)</p>
+                    </div>
+                    <div class="stat-card" style="border-color: #a855f7;">
+                        <h3 style="color: #a855f7;">{{ stats.mobile_sessions }}</h3>
+                        <p>Sessions Mobiles</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sessions Section -->
+            <div id="section-sessions" class="section-panel">
+                <div class="main-header">
+                    <h2>Sessions Web</h2>
+                    <p>Proprietaires connectes sur le site web</p>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">
+                        <h3>&#128994; Proprietaires connectes (Web)</h3>
+                        <button class="btn btn-primary" onclick="refreshSessions()">Actualiser</button>
+                    </div>
+                    {% if active_sessions %}
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Utilisateur</th>
+                                <th>Email</th>
+                                <th>Connexion</th>
+                                <th>Derniere activite</th>
+                                <th>IP</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sess in active_sessions %}
+                            <tr>
+                                <td><strong>{{ sess.firstname }} {{ sess.lastname }}</strong></td>
+                                <td>{{ sess.email }}</td>
+                                <td>{{ sess.login_time[:19] if sess.login_time else '-' }}</td>
+                                <td>{{ sess.last_activity[:19] if sess.last_activity else '-' }}</td>
+                                <td>{{ sess.ip_address }}</td>
+                                <td class="actions">
+                                    <button class="btn btn-danger btn-sm" onclick="disconnectSession('{{ sess.token_preview }}', '{{ sess.email }}')">Deconnecter</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p style="color: #8b949e; text-align: center; padding: 2rem;">Aucun utilisateur connecte</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Users Section -->
+            <div id="section-users" class="section-panel">
+                <div class="main-header">
+                    <h2>Utilisateurs Web (Proprietaires)</h2>
+                    <p>Comptes proprietaires crees sur le site web</p>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">
+                        <h3>&#128101; Liste des proprietaires</h3>
+                        <button class="btn btn-primary" onclick="refreshData()">Actualiser</button>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Email</th>
+                                <th>Prenom</th>
+                                <th>Nom</th>
+                                <th>Source</th>
+                                <th>Mot de passe</th>
+                                <th>Google ID</th>
+                                <th>Cree le</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr>
+                                <td>{{ user.id }}</td>
+                                <td>{{ user.email }}</td>
+                                <td>{{ user.firstname }}</td>
+                                <td>{{ user.lastname }}</td>
+                                <td>
+                                    {% if user.source_platform == 'mobile' %}
+                                    <span class="badge" style="background: #a855f7; color: white;">&#128241; Mobile</span>
+                                    {% else %}
+                                    <span class="badge" style="background: #3b82f6; color: white;">&#128187; Web</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if user.password_plain %}
+                                    <code style="background: #0d1117; padding: 2px 6px; border-radius: 4px; cursor: pointer;" onclick="copyToClipboard('{{ user.password_plain }}')" title="Cliquer pour copier">{{ user.password_plain }}</code>
+                                    {% elif user.google_id %}
+                                    <span style="color: #8b949e; font-style: italic;">Google Auth</span>
+                                    {% else %}
+                                    <span style="color: #f59e0b;">Non disponible</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ user.google_id or '-' }}</td>
+                                <td>{{ user.created_at }}</td>
+                                <td class="actions">
+                                    <button class="btn btn-primary btn-sm" onclick="openResetPasswordModal({{ user.id }}, '{{ user.email }}')">MdP</button>
+                                    <button class="btn btn-danger btn-sm" onclick="deleteUser({{ user.id }}, '{{ user.email }}')">Suppr</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Properties Section -->
+            <div id="section-properties" class="section-panel">
+                <div class="main-header">
+                    <h2>Proprietes</h2>
+                    <p>Gestion des proprietes/locations</p>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">
+                        <h3>&#127968; Liste des proprietes</h3>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Icon</th>
+                                <th>Nom</th>
+                                <th>Slug</th>
+                                <th>Proprietaire</th>
+                                <th>Theme</th>
+                                <th>Actif</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for prop in properties %}
+                            <tr>
+                                <td>{{ prop.id }}</td>
+                                <td>{{ prop.icon }}</td>
+                                <td>{{ prop.name }}</td>
+                                <td><code>{{ prop.slug }}</code></td>
+                                <td>{{ prop.user_id or '-' }} {% if prop.owner_email %}({{ prop.owner_email }}){% endif %}</td>
+                                <td>{{ prop.theme }}</td>
+                                <td>
+                                    {% if prop.is_active %}
+                                    <span class="badge badge-active">Actif</span>
+                                    {% else %}
+                                    <span class="badge badge-inactive">Inactif</span>
+                                    {% endif %}
+                                </td>
+                                <td class="actions">
+                                    <button class="btn btn-primary btn-sm" onclick="toggleProperty({{ prop.id }})">Toggle</button>
+                                    <button class="btn btn-danger btn-sm" onclick="deleteProperty({{ prop.id }}, '{{ prop.name }}')">Suppr</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Mobile Sessions Section -->
+            <div id="section-mobile-sessions" class="section-panel">
+                <div class="main-header">
+                    <h2>Sessions Mobiles</h2>
+                    <p>Connexions depuis l'application mobile LocApp</p>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">
+                        <h3>&#128241; Appareils connectes</h3>
+                        <button class="btn btn-primary" onclick="refreshData()">Actualiser</button>
+                    </div>
+                    {% if mobile_sessions %}
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Utilisateur</th>
+                                <th>Email</th>
+                                <th>Appareil</th>
+                                <th>Version App</th>
+                                <th>Derniere activite</th>
+                                <th>IP</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sess in mobile_sessions %}
+                            <tr>
+                                <td><strong>{{ sess.firstname }} {{ sess.lastname }}</strong></td>
+                                <td>{{ sess.email }}</td>
+                                <td>
+                                    <span style="color: #a855f7;">{{ sess.device_name or 'Inconnu' }}</span><br>
+                                    <small style="color: #8b949e;">{{ sess.device_model or '' }} {{ sess.os_version or '' }}</small>
+                                </td>
+                                <td>{{ sess.app_version or '-' }}</td>
+                                <td>{{ sess.last_activity[:19] if sess.last_activity else '-' }}</td>
+                                <td>{{ sess.ip_address or '-' }}</td>
+                                <td class="actions">
+                                    <button class="btn btn-danger btn-sm" onclick="disconnectMobileSession({{ sess.id }}, '{{ sess.email }}')">Deconnecter</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p style="color: #8b949e; text-align: center; padding: 2rem;">Aucun appareil mobile connecte</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Mobile Users Section -->
+            <div id="section-mobile-users" class="section-panel">
+                <div class="main-header">
+                    <h2>Utilisateurs Mobiles (Voyageurs)</h2>
+                    <p>Comptes voyageurs crees sur l'application mobile</p>
+                </div>
+
+                <div class="section">
+                    <div class="section-header">
+                        <h3>&#128100; Liste des voyageurs</h3>
+                        <button class="btn btn-primary" onclick="refreshData()">Actualiser</button>
+                    </div>
+                    {% if mobile_users %}
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Email</th>
+                                <th>Prenom</th>
+                                <th>Nom</th>
+                                <th>Source</th>
+                                <th>Statut</th>
+                                <th>Cree le</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in mobile_users %}
+                            <tr>
+                                <td>{{ user.id }}</td>
+                                <td>{{ user.email }}</td>
+                                <td>{{ user.firstname }}</td>
+                                <td>{{ user.lastname }}</td>
+                                <td>
+                                    {% if user.source_platform == 'web' %}
+                                    <span class="badge" style="background: #3b82f6; color: white;">&#128187; Web</span>
+                                    {% else %}
+                                    <span class="badge" style="background: #a855f7; color: white;">&#128241; Mobile</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if user.is_active %}
+                                    <span class="badge badge-active">Actif</span>
+                                    {% else %}
+                                    <span class="badge badge-inactive">Inactif</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ user.created_at }}</td>
+                                <td class="actions">
+                                    <button class="btn btn-danger btn-sm" onclick="deleteMobileUser({{ user.id }}, '{{ user.email }}')">Suppr</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p style="color: #8b949e; text-align: center; padding: 2rem;">Aucun utilisateur mobile</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- API Keys Section -->
+            <div id="section-api-keys" class="section-panel">
+                <div class="main-header">
+                    <h2>Cles API & Configuration</h2>
+                    <p>Gestion des cles API et variables d'environnement</p>
+                </div>
+
+                <div class="warning-box">
+                    &#9888;&#65039; Attention: Ces cles sont sensibles. Ne les partagez pas.
+                </div>
+
+                <div class="section">
+                    <form id="envConfigForm">
+                        <!-- Flask Secret Key -->
+                        <div class="form-group">
+                            <label style="color: #e94560; font-weight: 600;">&#128274; SECRET_KEY (Flask)</label>
+                            <input type="text" id="env_secret_key" class="env-input" placeholder="Cle secrete Flask">
+                            <small>Cle utilisee pour signer les sessions Flask</small>
+                        </div>
+
+                        <!-- Google OAuth -->
+                        <div class="section" style="margin-top: 1rem;">
+                            <h3 style="color: #58a6ff; margin-bottom: 1rem;">&#128309; Google OAuth</h3>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>GOOGLE_CLIENT_ID</label>
+                                    <input type="text" id="env_google_client_id" class="env-input" placeholder="Client ID">
+                                </div>
+                                <div class="form-group">
+                                    <label>GOOGLE_CLIENT_SECRET</label>
+                                    <input type="text" id="env_google_client_secret" class="env-input" placeholder="Client Secret">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Google Maps -->
+                        <div class="section" style="margin-top: 1rem;">
+                            <h3 style="color: #10b981; margin-bottom: 1rem;">&#127758; Google Maps</h3>
+                            <div class="form-group">
+                                <label>GOOGLE_MAPS_API_KEY</label>
+                                <input type="text" id="env_google_maps_api_key" class="env-input" placeholder="Cle API">
+                            </div>
+                        </div>
+
+                        <!-- OpenAI -->
+                        <div class="section" style="margin-top: 1rem;">
+                            <h3 style="color: #a855f7; margin-bottom: 1rem;">&#129302; OpenAI / ChatGPT</h3>
+                            <div class="form-group">
+                                <label>OPENAI_API_KEY</label>
+                                <input type="password" id="env_openai_api_key" class="env-input" placeholder="sk-...">
+                            </div>
+                            <div class="form-group">
+                                <label>OPENAI_MODEL</label>
+                                <select id="env_openai_model" class="env-input">
+                                    <option value="gpt-4o-mini">gpt-4o-mini (Rapide & Economique)</option>
+                                    <option value="gpt-4o">gpt-4o (Plus puissant)</option>
+                                    <option value="gpt-4-turbo">gpt-4-turbo (Contexte large)</option>
+                                </select>
+                            </div>
+                            <button type="button" class="btn btn-secondary" onclick="testOpenAIConnection()" style="background: #a855f7;">
+                                &#129514; Tester la connexion
+                            </button>
+                            <span id="openai-test-result" style="margin-left: 1rem;"></span>
+                        </div>
+
+                        <!-- Email SMTP -->
+                        <div class="section" style="margin-top: 1rem;">
+                            <h3 style="color: #f59e0b; margin-bottom: 1rem;">&#128231; Configuration Email (SMTP)</h3>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>SMTP_SERVER</label>
+                                    <input type="text" id="env_smtp_server" class="env-input" placeholder="smtp.gmail.com">
+                                </div>
+                                <div class="form-group">
+                                    <label>SMTP_PORT</label>
+                                    <input type="text" id="env_smtp_port" class="env-input" placeholder="587">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>SENDER_EMAIL</label>
+                                <input type="email" id="env_sender_email" class="env-input" placeholder="email@example.com">
+                            </div>
+                            <div class="form-group">
+                                <label>SENDER_PASSWORD</label>
+                                <input type="text" id="env_sender_password" class="env-input" placeholder="App Password">
+                            </div>
+                            <div class="form-group">
+                                <label>NOTIFICATION_EMAIL</label>
+                                <input type="email" id="env_notification_email" class="env-input" placeholder="admin@example.com">
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 1.5rem; display: flex; gap: 0.5rem;">
+                            <button type="submit" class="btn btn-primary">&#128190; Enregistrer</button>
+                            <button type="button" class="btn btn-secondary" onclick="loadEnvConfig()">Annuler</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Photos Limits Section -->
+            <div id="section-photos" class="section-panel">
+                <div class="main-header">
+                    <h2>Limites de Photos</h2>
+                    <p>Configuration du nombre maximum de photos</p>
+                </div>
+
+                <div class="section">
+                    <form id="photoLimitsForm">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>&#128248; Galerie Photos (page Photos)</label>
+                                <input type="number" id="config_max_photos_gallery" class="env-input" min="1" max="100" placeholder="50">
+                                <small>Nombre max de photos dans la galerie principale</small>
+                            </div>
+                            <div class="form-group">
+                                <label>&#128272; Photos d'Acces (page Acces)</label>
+                                <input type="number" id="config_max_photos_access" class="env-input" min="1" max="20" placeholder="3">
+                                <small>Nombre max de photos pour l'aide a l'acces</small>
+                            </div>
+                        </div>
+                        <div style="margin-top: 1rem;">
+                            <button type="submit" class="btn btn-primary">&#128190; Enregistrer les limites</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- SQL Console Section -->
+            <div id="section-sql" class="section-panel">
+                <div class="main-header">
+                    <h2>Console SQL</h2>
+                    <p>Executer des requetes SQL (lecture seule)</p>
+                </div>
+
+                <div class="warning-box">
+                    &#9888;&#65039; Cette console permet uniquement les requetes SELECT pour des raisons de securite.
+                </div>
+
+                <div class="section">
+                    <div class="sql-console">
+                        <textarea id="sql-query" placeholder="SELECT * FROM users LIMIT 10;">SELECT * FROM users LIMIT 10;</textarea>
+                        <div style="margin-top: 0.5rem;">
+                            <button class="btn btn-primary" onclick="executeSQL()">Executer</button>
+                        </div>
+                        <div class="sql-results" id="sql-results">
+                            <pre>Resultats de la requete...</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Database Section -->
+            <div id="section-database" class="section-panel">
+                <div class="main-header">
+                    <h2>Base de donnees</h2>
+                    <p>Structure des tables de la base de donnees</p>
+                </div>
+
+                <div class="section">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Table</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>users</code></td><td>Comptes utilisateurs</td></tr>
+                            <tr><td><code>properties</code></td><td>Proprietes/Locations</td></tr>
+                            <tr><td><code>general_info</code></td><td>Informations generales par propriete</td></tr>
+                            <tr><td><code>wifi_config</code></td><td>Configuration WiFi</td></tr>
+                            <tr><td><code>address</code></td><td>Adresses des proprietes</td></tr>
+                            <tr><td><code>parking_info</code></td><td>Informations parking</td></tr>
+                            <tr><td><code>access_info</code></td><td>Instructions d'acces</td></tr>
+                            <tr><td><code>contact_info</code></td><td>Contacts proprietaires</td></tr>
+                            <tr><td><code>activities</code></td><td>Activites a proximite</td></tr>
+                            <tr><td><code>nearby_services</code></td><td>Services a proximite</td></tr>
+                            <tr><td><code>emergency_numbers</code></td><td>Numeros d'urgence</td></tr>
+                            <tr><td><code>calendar_sources</code></td><td>Sources de calendrier iCal</td></tr>
+                            <tr><td><code>calendar_events</code></td><td>Evenements du calendrier</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Roadmap Section -->
+            <div id="section-roadmap" class="section-panel">
+                <div class="main-header">
+                    <h2>Evolution Calendrier</h2>
+                    <p>Roadmap pour l'integration des calendriers</p>
+                </div>
+
+                <div class="section" style="border-color: #10b981;">
+                    <h3 style="color: #10b981;">&#9989; Phase 1 & 2 : Import/Export iCal (IMPLEMENTE)</h3>
+                    <ul style="color: #8b949e; margin: 1rem 0 0 1.5rem; line-height: 1.8;">
+                        <li>Import des calendriers iCal depuis Booking.com et Airbnb</li>
+                        <li>Export du calendrier unifie au format iCal</li>
+                        <li>Synchronisation automatique et manuelle</li>
+                        <li>Blocage manuel de dates</li>
+                        <li>Detection automatique de la plateforme source</li>
+                    </ul>
+                </div>
+
+                <div class="section" style="border-color: #f59e0b;">
+                    <h3 style="color: #f59e0b;">&#9203; Phase 3 : Integration API complete (A VENIR)</h3>
+                    <p style="color: #8b949e; margin: 1rem 0;">
+                        Cette phase necessite des partenariats officiels avec les plateformes de reservation.
+                    </p>
+
+                    <div class="info-card">
+                        <h5 style="color: #ff5a5f;">&#127968; Airbnb API</h5>
+                        <ul>
+                            <li><strong>Programme requis:</strong> Airbnb Connected Apps Partner Program</li>
+                            <li><strong>Inscription:</strong> https://www.airbnb.com/partner</li>
+                            <li><strong>Pre-requis:</strong> Societe etablie, produit SaaS fonctionnel, CGU</li>
+                            <li><strong>Delai d'approbation:</strong> 2-6 mois</li>
+                        </ul>
+                    </div>
+
+                    <div class="info-card">
+                        <h5 style="color: #003580;">&#127313; Booking.com Connectivity Partner API</h5>
+                        <ul>
+                            <li><strong>Programme requis:</strong> Booking.com Connectivity Partner Program</li>
+                            <li><strong>Inscription:</strong> https://partner.booking.com/connectivity</li>
+                            <li><strong>Pre-requis:</strong> Channel Manager ou PMS certifie, 50-100 proprietes</li>
+                            <li><strong>Delai d'approbation:</strong> 3-12 mois</li>
+                        </ul>
+                    </div>
+
+                    <div class="info-card">
+                        <h5 style="color: #0077cc;">&#127969; VRBO / Expedia Partner API</h5>
+                        <ul>
+                            <li><strong>Programme requis:</strong> Expedia Group Connectivity Partner Program</li>
+                            <li><strong>Inscription:</strong> https://developers.expediagroup.com/</li>
+                            <li><strong>Delai d'approbation:</strong> 2-4 mois</li>
+                        </ul>
+                    </div>
+
+                    <div class="warning-box">
+                        <strong>&#9888;&#65039; Alternative recommandee</strong><br>
+                        Pour une integration plus rapide, envisager l'integration avec un Channel Manager existant:
+                        <strong>Smoobu</strong>, <strong>Lodgify</strong>, <strong>Hostaway</strong>, ou <strong>Guesty</strong>.
+                        Delai: 1-2 semaines.
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3 style="color: #8b949e;">&#128202; Recapitulatif des couts estimes</h3>
+                    <table class="data-table" style="margin-top: 1rem;">
+                        <thead>
+                            <tr>
+                                <th>Solution</th>
+                                <th>Cout initial</th>
+                                <th>Cout mensuel</th>
+                                <th>Delai</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>iCal (actuel)</td>
+                                <td style="color: #10b981;">Gratuit</td>
+                                <td style="color: #10b981;">0&#8364;</td>
+                                <td style="color: #10b981;">Immediat</td>
+                            </tr>
+                            <tr>
+                                <td>Channel Manager</td>
+                                <td>0-200&#8364;</td>
+                                <td>15-50&#8364;/propriete</td>
+                                <td>1-2 semaines</td>
+                            </tr>
+                            <tr>
+                                <td>API directe</td>
+                                <td>5000-20000&#8364;</td>
+                                <td>Variable</td>
+                                <td>6-12 mois</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Password Reset Modal -->
+    <div id="resetPasswordModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Reinitialiser le mot de passe</h3>
+                <button class="modal-close" onclick="closeResetPasswordModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 1rem;">Utilisateur: <strong id="resetPasswordEmail"></strong></p>
+                <div class="form-group">
+                    <label>Nouveau mot de passe</label>
+                    <input type="password" id="newPassword" class="env-input" placeholder="Minimum 8 caracteres">
+                </div>
+                <div class="form-group">
+                    <label>Confirmer le mot de passe</label>
+                    <input type="password" id="confirmPassword" class="env-input" placeholder="Confirmer">
+                </div>
+                <div id="resetPasswordError" style="color: #e94560; margin-top: 0.5rem; display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeResetPasswordModal()">Annuler</button>
+                <button class="btn btn-primary" onclick="submitResetPassword()">Reinitialiser</button>
+            </div>
+        </div>
+    </div>
 
     <script>
-        let currentResetUserId = null;
+        // Navigation
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const section = this.dataset.section;
 
+                // Update active nav item
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+
+                // Show section
+                document.querySelectorAll('.section-panel').forEach(p => p.classList.remove('active'));
+                document.getElementById('section-' + section).classList.add('active');
+            });
+        });
+
+        // Alerts
         function showAlert(message, type) {
             const container = document.getElementById('alert-container');
             const alert = document.createElement('div');
@@ -644,122 +1267,73 @@
             setTimeout(() => alert.remove(), 5000);
         }
 
-        function refreshData() {
-            window.location.reload();
+        function refreshData() { window.location.reload(); }
+        function refreshSessions() { window.location.reload(); }
+
+        // Copy to clipboard
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showAlert('Copie dans le presse-papier', 'success');
+            });
         }
 
-        function refreshSessions() {
-            window.location.reload();
-        }
-
+        // Session management
         async function disconnectSession(tokenPreview, email) {
-            if (!confirm(`Êtes-vous sûr de vouloir déconnecter "${email}" ?`)) {
-                return;
-            }
+            if (!confirm(`Deconnecter "${email}" ?`)) return;
             try {
-                const response = await fetch(`/superadmin/api/sessions/${tokenPreview}`, {
-                    method: 'DELETE'
-                });
-                const result = await response.json();
+                const response = await fetch(`/superadmin/api/sessions/${tokenPreview}`, { method: 'DELETE' });
                 if (response.ok) {
-                    showAlert('Utilisateur déconnecté', 'success');
+                    showAlert('Utilisateur deconnecte', 'success');
                     setTimeout(() => window.location.reload(), 1000);
-                } else {
-                    showAlert(result.error || 'Erreur', 'error');
                 }
             } catch (error) {
                 showAlert('Erreur de connexion', 'error');
             }
         }
 
+        // User management
         async function deleteUser(userId, email) {
-            if (!confirm(`Êtes-vous sûr de vouloir supprimer l'utilisateur "${email}" ?`)) {
-                return;
-            }
+            if (!confirm(`Supprimer "${email}" ?`)) return;
             try {
-                const response = await fetch(`/superadmin/api/users/${userId}`, {
-                    method: 'DELETE'
-                });
-                const result = await response.json();
+                const response = await fetch(`/superadmin/api/users/${userId}`, { method: 'DELETE' });
                 if (response.ok) {
-                    showAlert('Utilisateur supprimé', 'success');
+                    showAlert('Utilisateur supprime', 'success');
                     setTimeout(() => window.location.reload(), 1000);
-                } else {
-                    showAlert(result.error || 'Erreur', 'error');
                 }
             } catch (error) {
-                showAlert('Erreur de connexion', 'error');
+                showAlert('Erreur', 'error');
             }
         }
 
-        async function deleteProperty(propId, name) {
-            if (!confirm(`Êtes-vous sûr de vouloir supprimer la propriété "${name}" ? Cette action supprimera également toutes les données associées.`)) {
-                return;
-            }
+        // Mobile session management
+        async function disconnectMobileSession(sessionId, email) {
+            if (!confirm(`Deconnecter la session mobile de "${email}" ?`)) return;
             try {
-                const response = await fetch(`/superadmin/api/properties/${propId}`, {
-                    method: 'DELETE'
-                });
-                const result = await response.json();
+                const response = await fetch(`/superadmin/api/mobile-sessions/${sessionId}`, { method: 'DELETE' });
                 if (response.ok) {
-                    showAlert('Propriété supprimée', 'success');
-                    // Clear localStorage if this was the current property
-                    const savedProperty = localStorage.getItem('locapp_current_property');
-                    if (savedProperty == propId) {
-                        localStorage.removeItem('locapp_current_property');
-                    }
+                    showAlert('Session mobile deconnectee', 'success');
                     setTimeout(() => window.location.reload(), 1000);
-                } else {
-                    showAlert(result.error || 'Erreur', 'error');
                 }
             } catch (error) {
                 showAlert('Erreur de connexion', 'error');
             }
         }
 
-        async function toggleProperty(propId) {
+        // Mobile user management
+        async function deleteMobileUser(userId, email) {
+            if (!confirm(`Supprimer l'utilisateur mobile "${email}" ? Toutes ses sessions seront deconnectees.`)) return;
             try {
-                const response = await fetch(`/superadmin/api/properties/${propId}/toggle`, {
-                    method: 'POST'
-                });
-                const result = await response.json();
+                const response = await fetch(`/superadmin/api/mobile-users/${userId}`, { method: 'DELETE' });
                 if (response.ok) {
-                    showAlert('Statut modifié', 'success');
-                    setTimeout(() => window.location.reload(), 500);
-                } else {
-                    showAlert(result.error || 'Erreur', 'error');
+                    showAlert('Utilisateur mobile supprime', 'success');
+                    setTimeout(() => window.location.reload(), 1000);
                 }
             } catch (error) {
-                showAlert('Erreur de connexion', 'error');
+                showAlert('Erreur', 'error');
             }
         }
 
-        async function executeSQL() {
-            const query = document.getElementById('sql-query').value.trim();
-            const resultsDiv = document.getElementById('sql-results');
-
-            if (!query) {
-                resultsDiv.innerHTML = '<pre style="color: #e94560;">Veuillez entrer une requête SQL</pre>';
-                return;
-            }
-
-            try {
-                const response = await fetch('/superadmin/api/sql', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query: query })
-                });
-                const result = await response.json();
-
-                if (response.ok) {
-                    resultsDiv.innerHTML = `<pre>${JSON.stringify(result.data, null, 2)}</pre>`;
-                } else {
-                    resultsDiv.innerHTML = `<pre style="color: #e94560;">Erreur: ${result.error}</pre>`;
-                }
-            } catch (error) {
-                resultsDiv.innerHTML = `<pre style="color: #e94560;">Erreur de connexion</pre>`;
-            }
-        }
+        let currentResetUserId = null;
 
         function openResetPasswordModal(userId, email) {
             currentResetUserId = userId;
@@ -767,11 +1341,11 @@
             document.getElementById('newPassword').value = '';
             document.getElementById('confirmPassword').value = '';
             document.getElementById('resetPasswordError').style.display = 'none';
-            document.getElementById('resetPasswordModal').style.display = 'flex';
+            document.getElementById('resetPasswordModal').classList.add('active');
         }
 
         function closeResetPasswordModal() {
-            document.getElementById('resetPasswordModal').style.display = 'none';
+            document.getElementById('resetPasswordModal').classList.remove('active');
             currentResetUserId = null;
         }
 
@@ -780,19 +1354,11 @@
             const confirmPassword = document.getElementById('confirmPassword').value;
             const errorDiv = document.getElementById('resetPasswordError');
 
-            // Validation
-            if (!newPassword || !confirmPassword) {
-                errorDiv.textContent = 'Veuillez remplir tous les champs';
+            if (!newPassword || newPassword.length < 8) {
+                errorDiv.textContent = 'Minimum 8 caracteres';
                 errorDiv.style.display = 'block';
                 return;
             }
-
-            if (newPassword.length < 8) {
-                errorDiv.textContent = 'Le mot de passe doit contenir au moins 8 caractères';
-                errorDiv.style.display = 'block';
-                return;
-            }
-
             if (newPassword !== confirmPassword) {
                 errorDiv.textContent = 'Les mots de passe ne correspondent pas';
                 errorDiv.style.display = 'block';
@@ -805,63 +1371,74 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ password: newPassword })
                 });
-                const result = await response.json();
-
                 if (response.ok) {
                     closeResetPasswordModal();
-                    showAlert('Mot de passe réinitialisé avec succès', 'success');
-                } else {
-                    errorDiv.textContent = result.error || 'Erreur lors de la réinitialisation';
-                    errorDiv.style.display = 'block';
+                    showAlert('Mot de passe reinitialise', 'success');
+                    setTimeout(() => window.location.reload(), 1000);
                 }
             } catch (error) {
-                errorDiv.textContent = 'Erreur de connexion';
+                errorDiv.textContent = 'Erreur';
                 errorDiv.style.display = 'block';
             }
         }
 
-        // Close modal on escape key
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                closeResetPasswordModal();
+        // Property management
+        async function toggleProperty(propId) {
+            try {
+                const response = await fetch(`/superadmin/api/properties/${propId}/toggle`, { method: 'POST' });
+                if (response.ok) {
+                    showAlert('Statut modifie', 'success');
+                    setTimeout(() => window.location.reload(), 500);
+                }
+            } catch (error) {
+                showAlert('Erreur', 'error');
             }
-        });
-
-        // Close modal on click outside
-        document.getElementById('resetPasswordModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeResetPasswordModal();
-            }
-        });
-
-        // Clear superadmin session on page unload (refresh, close, navigate away)
-        window.addEventListener('beforeunload', function() {
-            // Use synchronous request to ensure logout happens before page unloads
-            navigator.sendBeacon('/superadmin/logout-silent');
-        });
-
-        // Copy to clipboard function
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text).then(() => {
-                showAlert('Mot de passe copié dans le presse-papier', 'success');
-            }).catch(err => {
-                // Fallback for older browsers
-                const textArea = document.createElement('textarea');
-                textArea.value = text;
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-                showAlert('Mot de passe copié dans le presse-papier', 'success');
-            });
         }
 
-        // ENV Config Management
+        async function deleteProperty(propId, name) {
+            if (!confirm(`Supprimer "${name}" et toutes ses donnees ?`)) return;
+            try {
+                const response = await fetch(`/superadmin/api/properties/${propId}`, { method: 'DELETE' });
+                if (response.ok) {
+                    showAlert('Propriete supprimee', 'success');
+                    localStorage.removeItem('locapp_current_property');
+                    setTimeout(() => window.location.reload(), 1000);
+                }
+            } catch (error) {
+                showAlert('Erreur', 'error');
+            }
+        }
+
+        // SQL Console
+        async function executeSQL() {
+            const query = document.getElementById('sql-query').value.trim();
+            const resultsDiv = document.getElementById('sql-results');
+
+            if (!query) {
+                resultsDiv.innerHTML = '<pre style="color: #e94560;">Entrez une requete</pre>';
+                return;
+            }
+
+            try {
+                const response = await fetch('/superadmin/api/sql', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+                const result = await response.json();
+                resultsDiv.innerHTML = response.ok
+                    ? `<pre>${JSON.stringify(result.data, null, 2)}</pre>`
+                    : `<pre style="color: #e94560;">Erreur: ${result.error}</pre>`;
+            } catch (error) {
+                resultsDiv.innerHTML = '<pre style="color: #e94560;">Erreur de connexion</pre>';
+            }
+        }
+
+        // ENV Config
         async function loadEnvConfig() {
             try {
                 const response = await fetch('/superadmin/api/env-config');
                 const result = await response.json();
-
                 if (response.ok) {
                     document.getElementById('env_secret_key').value = result.SECRET_KEY || '';
                     document.getElementById('env_google_client_id').value = result.GOOGLE_CLIENT_ID || '';
@@ -874,17 +1451,14 @@
                     document.getElementById('env_sender_email').value = result.SENDER_EMAIL || '';
                     document.getElementById('env_sender_password').value = result.SENDER_PASSWORD || '';
                     document.getElementById('env_notification_email').value = result.NOTIFICATION_EMAIL || '';
-                } else {
-                    showAlert(result.error || 'Erreur lors du chargement', 'error');
                 }
             } catch (error) {
-                showAlert('Erreur de connexion', 'error');
+                showAlert('Erreur de chargement', 'error');
             }
         }
 
         document.getElementById('envConfigForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-
             const data = {
                 SECRET_KEY: document.getElementById('env_secret_key').value,
                 GOOGLE_CLIENT_ID: document.getElementById('env_google_client_id').value,
@@ -905,66 +1479,45 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
-
-                const result = await response.json();
-
                 if (response.ok) {
-                    showAlert('Configuration sauvegardée avec succès', 'success');
-                } else {
-                    showAlert(result.error || 'Erreur lors de la sauvegarde', 'error');
+                    showAlert('Configuration sauvegardee', 'success');
                 }
             } catch (error) {
-                showAlert('Erreur de connexion', 'error');
+                showAlert('Erreur', 'error');
             }
         });
 
-        // Load ENV config on page load
-        loadEnvConfig();
-
-        // Test OpenAI Connection
         async function testOpenAIConnection() {
             const resultSpan = document.getElementById('openai-test-result');
-            resultSpan.innerHTML = '<span style="color: #f59e0b;">Test en cours...</span>';
+            resultSpan.innerHTML = '<span style="color: #f59e0b;">Test...</span>';
 
             try {
-                const response = await fetch('/superadmin/api/test-openai', {
-                    method: 'POST'
-                });
+                const response = await fetch('/superadmin/api/test-openai', { method: 'POST' });
                 const result = await response.json();
-
-                if (response.ok) {
-                    resultSpan.innerHTML = '<span style="color: #10b981;">✓ Connexion réussie!</span>';
-                } else {
-                    resultSpan.innerHTML = `<span style="color: #e94560;">✗ ${result.error}</span>`;
-                }
+                resultSpan.innerHTML = response.ok
+                    ? '<span style="color: #10b981;">&#10003; Connexion reussie!</span>'
+                    : `<span style="color: #e94560;">&#10007; ${result.error}</span>`;
             } catch (error) {
-                resultSpan.innerHTML = '<span style="color: #e94560;">✗ Erreur de connexion</span>';
+                resultSpan.innerHTML = '<span style="color: #e94560;">&#10007; Erreur</span>';
             }
         }
 
-        // ============================================
-        // Photo Limits Management
-        // ============================================
-
+        // Photo Limits
         async function loadPhotoLimits() {
             try {
                 const response = await fetch('/superadmin/api/app-config');
                 const result = await response.json();
-
                 if (response.ok) {
                     document.getElementById('config_max_photos_gallery').value = result.max_photos_gallery?.value || '50';
                     document.getElementById('config_max_photos_access').value = result.max_photos_access?.value || '3';
-                } else {
-                    showAlert(result.error || 'Erreur lors du chargement', 'error');
                 }
             } catch (error) {
-                showAlert('Erreur de connexion', 'error');
+                showAlert('Erreur', 'error');
             }
         }
 
         document.getElementById('photoLimitsForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-
             const data = {
                 max_photos_gallery: document.getElementById('config_max_photos_gallery').value,
                 max_photos_access: document.getElementById('config_max_photos_access').value
@@ -976,20 +1529,31 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
-
-                const result = await response.json();
-
                 if (response.ok) {
-                    showAlert('Limites de photos mises à jour', 'success');
-                } else {
-                    showAlert(result.error || 'Erreur lors de la sauvegarde', 'error');
+                    showAlert('Limites mises a jour', 'success');
                 }
             } catch (error) {
-                showAlert('Erreur de connexion', 'error');
+                showAlert('Erreur', 'error');
             }
         });
 
-        // Load photo limits on page load
+        // Close modal on escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeResetPasswordModal();
+        });
+
+        // Close modal on click outside
+        document.getElementById('resetPasswordModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('resetPasswordModal')) closeResetPasswordModal();
+        });
+
+        // Logout on page unload
+        window.addEventListener('beforeunload', () => {
+            navigator.sendBeacon('/superadmin/logout-silent');
+        });
+
+        // Init
+        loadEnvConfig();
         loadPhotoLimits();
     </script>
 </body>

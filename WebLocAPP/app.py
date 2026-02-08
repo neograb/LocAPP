@@ -795,6 +795,14 @@ def equipements_page():
     properties = get_user_properties(current_user)
     return render_template('equipements.html', properties=properties, current_user=current_user)
 
+@app.route('/calendar')
+@login_required
+def calendar_page():
+    """Calendar management page with iCal sync"""
+    current_user = get_current_user()
+    properties = get_user_properties(current_user)
+    return render_template('calendar.html', properties=properties, current_user=current_user)
+
 # API Routes - Properties
 @app.route('/api/properties', methods=['GET'])
 def get_properties():
@@ -1281,6 +1289,73 @@ def ai_regenerate_activities():
         print(f"[AI Regenerate Activities] Error: {e}")
         return jsonify({'error': 'Erreur lors de la régénération'}), 500
 
+
+@app.route('/api/ai/regenerate/activity/<int:activity_id>', methods=['POST'])
+@requires_auth
+def ai_regenerate_single_activity(activity_id):
+    """Regenerate a single activity with AI"""
+    from ai_service import AIService
+
+    current_user = get_current_user()
+    if not check_ai_access(current_user):
+        return jsonify({'error': 'Fonctionnalité réservée aux abonnés'}), 403
+
+    property_id = get_verified_property_id()
+    if not property_id:
+        return jsonify({'error': 'Propriété non trouvée'}), 404
+
+    try:
+        # Get existing activity
+        activity = db.get_activity(activity_id)
+        if not activity:
+            return jsonify({'error': 'Activité non trouvée'}), 404
+
+        # Get property location info
+        _, city, region, _, _ = get_property_address_info(property_id)
+        if not city:
+            city = 'la région'
+        if not region:
+            region = 'France'
+
+        ai_service = AIService()
+        new_activity = ai_service.regenerate_single_activity(
+            activity['name'],
+            activity['category'],
+            city,
+            region
+        )
+
+        if not new_activity:
+            return jsonify({'error': 'Erreur lors de la régénération'}), 500
+
+        # Update the activity in database
+        db.update_activity(activity_id, {
+            'name': new_activity.get('name', activity['name']),
+            'description': new_activity.get('description', ''),
+            'emoji': new_activity.get('emoji', activity.get('emoji', '📍')),
+            'category': activity['category'],
+            'distance': activity.get('distance', ''),
+            'display_order': activity.get('display_order', 0)
+        })
+
+        print(f"[AI Regenerate Activity] Regenerated activity {activity_id}: {new_activity.get('name')}")
+
+        return jsonify({
+            'success': True,
+            'activity': {
+                'id': activity_id,
+                'name': new_activity.get('name'),
+                'description': new_activity.get('description'),
+                'emoji': new_activity.get('emoji'),
+                'category': activity['category']
+            },
+            'message': 'Activité régénérée avec succès'
+        })
+    except Exception as e:
+        print(f"[AI Regenerate Activity] Error: {e}")
+        return jsonify({'error': 'Erreur lors de la régénération'}), 500
+
+
 @app.route('/api/ai/regenerate/services', methods=['POST'])
 @requires_auth
 def ai_regenerate_services():
@@ -1363,6 +1438,51 @@ def ai_regenerate_parking():
     except Exception as e:
         print(f"[AI Regenerate Parking] Error: {e}")
         return jsonify({'error': 'Erreur lors de la régénération'}), 500
+
+@app.route('/api/ai/find-service', methods=['POST'])
+@requires_auth
+def ai_find_service():
+    """Find nearest service of a specific category using AI/Google Places"""
+    from ai_service import AIService
+
+    current_user = get_current_user()
+    if not check_ai_access(current_user):
+        return jsonify({'error': 'Fonctionnalité réservée aux abonnés'}), 403
+
+    property_id = get_verified_property_id()
+    if not property_id:
+        return jsonify({'error': 'Propriété non trouvée'}), 404
+
+    data = request.json
+    category = data.get('category')
+    if not category:
+        return jsonify({'error': 'Catégorie non spécifiée'}), 400
+
+    try:
+        ai_service = AIService()
+
+        full_address, city, region, latitude, longitude = get_property_address_info(property_id)
+        if not latitude or not longitude:
+            return jsonify({'error': 'Coordonnées GPS non configurées pour cette propriété'}), 400
+
+        # Find nearest service of this category
+        service = ai_service.find_service_by_category(
+            category,
+            float(latitude),
+            float(longitude)
+        )
+
+        if service:
+            return jsonify({
+                'success': True,
+                'service': service,
+                'message': f'{service["name"]} trouvé à {service["distance"]}'
+            })
+        else:
+            return jsonify({'error': f'Aucun service de type "{category}" trouvé à proximité'}), 404
+    except Exception as e:
+        print(f"[AI Find Service] Error: {e}")
+        return jsonify({'error': 'Erreur lors de la recherche'}), 500
 
 # API Routes - General Info
 @app.route('/api/general', methods=['GET'])
@@ -1717,7 +1837,7 @@ def create_service():
     if not property_id:
         return jsonify({'error': 'Accès non autorisé à cette propriété'}), 403
     data = request.json
-    service_id = db.create_nearby_service(data, property_id)
+    service_id = db.create_nearby_service(property_id, data)
     return jsonify({'success': True, 'id': service_id, 'message': 'Service créé'})
 
 @app.route('/api/services/<int:service_id>', methods=['PUT'])
@@ -1732,6 +1852,17 @@ def update_service(service_id):
 def delete_service(service_id):
     db.delete_nearby_service(service_id)
     return jsonify({'success': True, 'message': 'Service supprimé'})
+
+@app.route('/api/services/reorder', methods=['POST'])
+@requires_auth
+def reorder_services():
+    property_id = get_verified_property_id()
+    if not property_id:
+        return jsonify({'error': 'Accès non autorisé à cette propriété'}), 403
+    data = request.json
+    service_ids = data.get('service_ids', [])
+    db.reorder_services(property_id, service_ids)
+    return jsonify({'success': True, 'message': 'Ordre mis à jour'})
 
 # API Routes - Emergency Numbers
 @app.route('/api/emergency', methods=['GET'])
@@ -2386,17 +2517,25 @@ def superadmin_dashboard():
     # Get active sessions
     active_sessions = get_active_sessions()
 
+    # Get mobile sessions
+    mobile_sessions = db.get_all_mobile_sessions(active_only=True)
+
     # Get stats
     stats = {
         'users': conn.execute('SELECT COUNT(*) FROM users').fetchone()[0],
+        'mobile_users': conn.execute('SELECT COUNT(*) FROM mobile_users').fetchone()[0],
         'properties': conn.execute('SELECT COUNT(*) FROM properties').fetchone()[0],
         'activities': conn.execute('SELECT COUNT(*) FROM activities').fetchone()[0],
         'services': conn.execute('SELECT COUNT(*) FROM nearby_services').fetchone()[0],
         'active_sessions': len(active_sessions),
+        'mobile_sessions': len(mobile_sessions),
     }
 
-    # Get all users
+    # Get all users (web users / property owners)
     users = [dict(row) for row in conn.execute('SELECT * FROM users ORDER BY id DESC').fetchall()]
+
+    # Get all mobile users (travelers)
+    mobile_users = db.get_all_mobile_users_with_source()
 
     # Get all properties with owner email (including inactive)
     properties_rows = conn.execute('''
@@ -2412,8 +2551,10 @@ def superadmin_dashboard():
     return render_template('superadmin.html',
         stats=stats,
         users=users,
+        mobile_users=mobile_users,
         properties=properties,
         active_sessions=active_sessions,
+        mobile_sessions=mobile_sessions,
         admin_user=session.get('superadmin_user', 'Admin')
     )
 
@@ -2545,6 +2686,46 @@ def superadmin_disconnect_session(token_preview):
             return jsonify({'success': True, 'message': 'Session déconnectée'})
         else:
             return jsonify({'error': 'Session non trouvée'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/superadmin/api/mobile-sessions', methods=['GET'])
+@requires_superadmin
+def superadmin_get_mobile_sessions():
+    """Get all mobile sessions"""
+    try:
+        sessions = db.get_all_mobile_sessions(active_only=True)
+        return jsonify({
+            'success': True,
+            'sessions': sessions,
+            'count': len(sessions)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/superadmin/api/mobile-sessions/<int:session_id>', methods=['DELETE'])
+@requires_superadmin
+def superadmin_disconnect_mobile_session(session_id):
+    """Disconnect a mobile session"""
+    try:
+        conn = db.get_connection()
+        conn.execute('UPDATE mobile_sessions SET is_active = 0 WHERE id = ?', (session_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True, 'message': 'Session mobile déconnectée'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/superadmin/api/mobile-users/<int:user_id>', methods=['DELETE'])
+@requires_superadmin
+def superadmin_delete_mobile_user(user_id):
+    """Delete a mobile user"""
+    try:
+        # Deactivate all sessions first
+        db.deactivate_all_mobile_sessions(user_id)
+        # Soft delete the user
+        db.delete_mobile_user(user_id)
+        return jsonify({'success': True, 'message': 'Utilisateur mobile supprimé'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -3120,6 +3301,266 @@ def deactivate_token(property_id, token_id):
 
     db.deactivate_property_token(token_id)
     return jsonify({'success': True})
+
+# ==================== Calendar API Routes ====================
+
+@app.route('/api/properties/<int:property_id>/calendar/sources', methods=['GET'])
+@login_required
+def get_calendar_sources(property_id):
+    """Get all calendar sources for a property"""
+    user = get_current_user()
+    property_info = db.get_property(property_id)
+
+    if not property_info or property_info.get('user_id') != user.id:
+        return jsonify({'error': 'Non autorisé'}), 403
+
+    sources = db.get_calendar_sources(property_id)
+    return jsonify({'sources': sources})
+
+@app.route('/api/properties/<int:property_id>/calendar/sources', methods=['POST'])
+@login_required
+def add_calendar_source(property_id):
+    """Add a new calendar source (iCal URL)"""
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({'error': 'Session expirée'}), 401
+
+        property_info = db.get_property(property_id)
+        if not property_info or property_info.get('user_id') != user.id:
+            return jsonify({'error': 'Non autorisé'}), 403
+
+        data = request.json
+        source_name = data.get('source_name', '').strip()
+        ical_url = data.get('ical_url', '').strip()
+
+        if not source_name or not ical_url:
+            return jsonify({'error': 'Le nom et l\'URL sont requis'}), 400
+
+        # Validate URL format
+        if not ical_url.startswith(('http://', 'https://')):
+            return jsonify({'error': 'URL invalide'}), 400
+
+        source_id = db.add_calendar_source(property_id, source_name, ical_url)
+
+        # Try to sync immediately
+        try:
+            from calendar_service import CalendarService, CalendarError
+            calendar_service = CalendarService(db)
+            result = calendar_service.sync_calendar_source(source_id)
+            return jsonify({
+                'success': True,
+                'source_id': source_id,
+                'sync_result': result
+            })
+        except Exception as sync_error:
+            # Source was created but sync failed
+            print(f"[Calendar Add] Sync failed for source {source_id}: {sync_error}")
+            return jsonify({
+                'success': True,
+                'source_id': source_id,
+                'sync_error': str(sync_error)
+            })
+    except Exception as e:
+        import traceback
+        print(f"[Calendar Add Error] {traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/properties/<int:property_id>/calendar/sources/<int:source_id>', methods=['PUT'])
+@login_required
+def update_calendar_source(property_id, source_id):
+    """Update a calendar source"""
+    user = get_current_user()
+    property_info = db.get_property(property_id)
+
+    if not property_info or property_info.get('user_id') != user.id:
+        return jsonify({'error': 'Non autorisé'}), 403
+
+    data = request.json
+    db.update_calendar_source(
+        source_id,
+        source_name=data.get('source_name'),
+        ical_url=data.get('ical_url'),
+        is_active=data.get('is_active')
+    )
+    return jsonify({'success': True})
+
+@app.route('/api/properties/<int:property_id>/calendar/sources/<int:source_id>', methods=['DELETE'])
+@login_required
+def delete_calendar_source(property_id, source_id):
+    """Delete a calendar source"""
+    user = get_current_user()
+    property_info = db.get_property(property_id)
+
+    if not property_info or property_info.get('user_id') != user.id:
+        return jsonify({'error': 'Non autorisé'}), 403
+
+    db.delete_calendar_source(source_id)
+    return jsonify({'success': True})
+
+@app.route('/api/properties/<int:property_id>/calendar/sources/<int:source_id>/sync', methods=['POST'])
+@login_required
+def sync_calendar_source(property_id, source_id):
+    """Manually sync a calendar source"""
+    from calendar_service import CalendarService, CalendarError
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({'error': 'Session expirée'}), 401
+
+        property_info = db.get_property(property_id)
+        if not property_info or property_info.get('user_id') != user.id:
+            return jsonify({'error': 'Non autorisé'}), 403
+
+        calendar_service = CalendarService(db)
+        result = calendar_service.sync_calendar_source(source_id)
+        return jsonify(result)
+    except CalendarError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        import traceback
+        print(f"[Calendar Sync Error] {traceback.format_exc()}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/properties/<int:property_id>/calendar/sync-all', methods=['POST'])
+@login_required
+def sync_all_calendar_sources(property_id):
+    """Sync all calendar sources for a property"""
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({'error': 'Session expirée'}), 401
+
+        property_info = db.get_property(property_id)
+        if not property_info or property_info.get('user_id') != user.id:
+            return jsonify({'error': 'Non autorisé'}), 403
+
+        from calendar_service import CalendarService
+        calendar_service = CalendarService(db)
+        results = calendar_service.sync_all_property_sources(property_id)
+        return jsonify({'success': True, 'results': results})
+    except Exception as e:
+        import traceback
+        print(f"[Calendar Sync-All Error] {traceback.format_exc()}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/properties/<int:property_id>/calendar/events', methods=['GET'])
+@login_required
+def get_calendar_events(property_id):
+    """Get calendar events for a property"""
+    user = get_current_user()
+    property_info = db.get_property(property_id)
+
+    if not property_info or property_info.get('user_id') != user.id:
+        return jsonify({'error': 'Non autorisé'}), 403
+
+    start_date = request.args.get('start')
+    end_date = request.args.get('end')
+
+    events = db.get_calendar_events(property_id, start_date, end_date)
+    return jsonify({'events': events})
+
+@app.route('/api/properties/<int:property_id>/calendar/events', methods=['POST'])
+@login_required
+def add_calendar_event(property_id):
+    """Manually add a calendar event (blocking)"""
+    user = get_current_user()
+    property_info = db.get_property(property_id)
+
+    if not property_info or property_info.get('user_id') != user.id:
+        return jsonify({'error': 'Non autorisé'}), 403
+
+    data = request.json
+    start_date = data.get('start_date')
+    end_date = data.get('end_date')
+
+    if not start_date or not end_date:
+        return jsonify({'error': 'Les dates sont requises'}), 400
+
+    event_id = db.add_calendar_event(
+        property_id=property_id,
+        start_date=start_date,
+        end_date=end_date,
+        summary=data.get('summary', 'Bloqué manuellement'),
+        guest_name=data.get('guest_name'),
+        platform=data.get('platform', 'Manuel'),
+        status=data.get('status', 'confirmed'),
+        notes=data.get('notes')
+    )
+
+    return jsonify({'success': True, 'event_id': event_id})
+
+@app.route('/api/properties/<int:property_id>/calendar/events/<int:event_id>', methods=['PUT'])
+@login_required
+def update_calendar_event(property_id, event_id):
+    """Update a calendar event"""
+    user = get_current_user()
+    property_info = db.get_property(property_id)
+
+    if not property_info or property_info.get('user_id') != user.id:
+        return jsonify({'error': 'Non autorisé'}), 403
+
+    data = request.json
+    db.update_calendar_event(event_id, **data)
+    return jsonify({'success': True})
+
+@app.route('/api/properties/<int:property_id>/calendar/events/<int:event_id>', methods=['DELETE'])
+@login_required
+def delete_calendar_event(property_id, event_id):
+    """Delete a calendar event"""
+    user = get_current_user()
+    property_info = db.get_property(property_id)
+
+    if not property_info or property_info.get('user_id') != user.id:
+        return jsonify({'error': 'Non autorisé'}), 403
+
+    db.delete_calendar_event(event_id)
+    return jsonify({'success': True})
+
+@app.route('/api/properties/<int:property_id>/calendar/export.ics', methods=['GET'])
+def export_calendar_ical(property_id):
+    """Export property calendar as iCal file"""
+    # Get property info
+    property_info = db.get_property(property_id)
+    if not property_info:
+        return jsonify({'error': 'Propriété introuvable'}), 404
+
+    try:
+        from calendar_service import CalendarService
+        calendar_service = CalendarService(db)
+        ical_content = calendar_service.generate_ical_export(
+            property_id,
+            property_name=property_info.get('name'),
+            property_slug=property_info.get('slug')
+        )
+
+        response = app.response_class(
+            response=ical_content,
+            status=200,
+            mimetype='text/calendar'
+        )
+        response.headers['Content-Disposition'] = f'attachment; filename="{property_info.get("slug", "calendar")}.ics"'
+        return response
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/properties/<int:property_id>/calendar/check-availability', methods=['POST'])
+def check_calendar_availability(property_id):
+    """Check if dates are available"""
+    data = request.json
+    check_in = data.get('check_in')
+    check_out = data.get('check_out')
+
+    if not check_in or not check_out:
+        return jsonify({'error': 'Les dates sont requises'}), 400
+
+    try:
+        from calendar_service import CalendarService
+        calendar_service = CalendarService(db)
+        result = calendar_service.check_availability(property_id, check_in, check_out)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)

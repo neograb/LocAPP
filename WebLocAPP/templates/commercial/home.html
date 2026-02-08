@@ -113,29 +113,29 @@
         </div>
         <div class="features-grid">
             <div class="feature-card">
+                <div class="feature-icon">📱</div>
+                <h3>Application Mobile</h3>
+                <p>Vos voyageurs accèdent à toutes les informations depuis notre application iOS et Android. Hors-ligne inclus.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🤖</div>
+                <h3>Génération IA</h3>
+                <p>Créez votre propriété en un clic : description, activités, services... tout est généré automatiquement par l'IA.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📅</div>
+                <h3>Sync Calendrier</h3>
+                <p>Synchronisez vos réservations Airbnb, Booking.com et autres plateformes via iCal. Export inclus.</p>
+            </div>
+            <div class="feature-card">
                 <div class="feature-icon">📶</div>
                 <h3>QR Code WiFi</h3>
                 <p>Vos voyageurs se connectent au WiFi instantanément en scannant le QR Code. Plus besoin de noter le mot de passe.</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">🔑</div>
-                <h3>Instructions d'accès</h3>
-                <p>Codes de portes, boîte à clés, parking... Toutes les informations pour une arrivée en toute autonomie.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">🎯</div>
-                <h3>Activités locales</h3>
-                <p>Partagez vos meilleures recommandations : restaurants, visites, randonnées, activités sportives...</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">🛎️</div>
-                <h3>Services à proximité</h3>
-                <p>Pharmacie, médecin, supermarché... Toutes les adresses utiles à portée de main.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">🆘</div>
-                <h3>Numéros d'urgence</h3>
-                <p>En cas de besoin, vos voyageurs ont accès immédiatement aux contacts importants.</p>
+                <div class="feature-icon">📷</div>
+                <h3>Galerie Photos</h3>
+                <p>Partagez des photos de votre propriété et des instructions visuelles pour faciliter l'arrivée.</p>
             </div>
             <div class="feature-card">
                 <div class="feature-icon">🏠</div>
@@ -145,6 +145,64 @@
         </div>
         <div class="text-center mt-4">
             <a href="{{ url_for('commercial_features') }}" class="btn btn-primary">Découvrir toutes les fonctionnalités</a>
+        </div>
+    </div>
+</section>
+
+<!-- Mobile App Section -->
+<section class="section">
+    <div class="section-container">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center;">
+            <div>
+                <h2 style="margin-bottom: 1rem;">Une application mobile pour vos voyageurs</h2>
+                <p style="color: var(--text-light); margin-bottom: 1.5rem;">
+                    Vos voyageurs téléchargent l'application LocAPP, scannent le QR Code de votre propriété et accèdent instantanément à toutes les informations. Même hors-ligne !
+                </p>
+                <ul style="list-style: none; padding: 0; margin-bottom: 2rem;">
+                    <li style="padding: 0.5rem 0; display: flex; align-items: center; gap: 0.75rem;">
+                        <span style="color: #10b981; font-size: 1.25rem;">✓</span>
+                        Disponible sur iOS et Android
+                    </li>
+                    <li style="padding: 0.5rem 0; display: flex; align-items: center; gap: 0.75rem;">
+                        <span style="color: #10b981; font-size: 1.25rem;">✓</span>
+                        Mode hors-ligne complet
+                    </li>
+                    <li style="padding: 0.5rem 0; display: flex; align-items: center; gap: 0.75rem;">
+                        <span style="color: #10b981; font-size: 1.25rem;">✓</span>
+                        Historique des séjours
+                    </li>
+                    <li style="padding: 0.5rem 0; display: flex; align-items: center; gap: 0.75rem;">
+                        <span style="color: #10b981; font-size: 1.25rem;">✓</span>
+                        Navigation GPS intégrée
+                    </li>
+                </ul>
+                <div style="display: flex; gap: 1rem;">
+                    <a href="#" class="btn btn-outline" style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span></span> App Store
+                    </a>
+                    <a href="#" class="btn btn-outline" style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span></span> Google Play
+                    </a>
+                </div>
+            </div>
+            <div style="text-align: center;">
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 24px; padding: 2rem; display: inline-block;">
+                    <div style="background: #1a1a2e; border-radius: 16px; padding: 1rem; width: 200px;">
+                        <div style="text-align: center; color: white; margin-bottom: 1rem;">
+                            <div style="font-size: 2rem;">🏡</div>
+                            <div style="font-weight: 600;">LocAPP</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.1); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.5rem;">
+                            <div style="color: white; font-size: 0.85rem;">Le Mazet de BSA</div>
+                            <div style="color: rgba(255,255,255,0.6); font-size: 0.75rem;">Ardèche</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.1); border-radius: 8px; padding: 0.75rem;">
+                            <div style="color: white; font-size: 0.85rem;">Appartement Vaujany</div>
+                            <div style="color: rgba(255,255,255,0.6); font-size: 0.75rem;">Isère</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </section>

@@ -380,6 +380,45 @@ class Database:
         except:
             pass  # Column already exists
 
+        # Table pour les sources de calendrier (iCal)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS calendar_sources (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                property_id INTEGER NOT NULL,
+                source_name TEXT NOT NULL,
+                source_type TEXT DEFAULT 'ical',
+                ical_url TEXT NOT NULL,
+                last_sync TIMESTAMP,
+                sync_status TEXT DEFAULT 'pending',
+                sync_error TEXT,
+                is_active BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (property_id) REFERENCES properties(id)
+            )
+        ''')
+
+        # Table pour les événements du calendrier (réservations importées)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS calendar_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                property_id INTEGER NOT NULL,
+                source_id INTEGER,
+                uid TEXT,
+                summary TEXT,
+                start_date DATE NOT NULL,
+                end_date DATE NOT NULL,
+                guest_name TEXT,
+                platform TEXT,
+                status TEXT DEFAULT 'confirmed',
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (property_id) REFERENCES properties(id),
+                FOREIGN KEY (source_id) REFERENCES calendar_sources(id)
+            )
+        ''')
+
         conn.commit()
 
         # Migrer les données existantes et insérer les valeurs par défaut
@@ -408,6 +447,31 @@ class Database:
 
         # Migrate: insert default app config values
         self._migrate_insert_default_app_config(cursor, conn)
+
+        # Migrate: add source_platform column to users
+        self._migrate_add_source_platform_to_users(cursor, conn)
+
+        # Migrate: add source_platform column to mobile_users
+        self._migrate_add_source_platform_to_mobile_users(cursor, conn)
+
+        # Create mobile_sessions table for tracking mobile connections
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS mobile_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                mobile_user_id INTEGER NOT NULL,
+                device_name TEXT,
+                device_model TEXT,
+                os_version TEXT,
+                app_version TEXT,
+                token TEXT NOT NULL UNIQUE,
+                ip_address TEXT,
+                is_active BOOLEAN DEFAULT 1,
+                last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (mobile_user_id) REFERENCES mobile_users(id)
+            )
+        ''')
+        conn.commit()
 
         conn.close()
 
@@ -511,6 +575,24 @@ class Database:
                 ''', (key, value, description))
 
         conn.commit()
+
+    def _migrate_add_source_platform_to_users(self, cursor, conn):
+        """Migration: Add source_platform column to users table"""
+        cursor.execute("PRAGMA table_info(users)")
+        columns = [col[1] for col in cursor.fetchall()]
+
+        if 'source_platform' not in columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN source_platform TEXT DEFAULT 'web'")
+            conn.commit()
+
+    def _migrate_add_source_platform_to_mobile_users(self, cursor, conn):
+        """Migration: Add source_platform column to mobile_users table"""
+        cursor.execute("PRAGMA table_info(mobile_users)")
+        columns = [col[1] for col in cursor.fetchall()]
+
+        if 'source_platform' not in columns:
+            cursor.execute("ALTER TABLE mobile_users ADD COLUMN source_platform TEXT DEFAULT 'mobile'")
+            conn.commit()
 
     def _migrate_and_insert_default_data(self, cursor, conn):
         """Migrate existing data and insert default data"""
@@ -1579,6 +1661,16 @@ class Database:
         conn.commit()
         conn.close()
 
+    def reorder_services(self, property_id, service_ids):
+        """Reorder services based on the provided list of IDs"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        for order, service_id in enumerate(service_ids):
+            cursor.execute('UPDATE nearby_services SET display_order=? WHERE id=? AND property_id=?',
+                         (order, service_id, property_id))
+        conn.commit()
+        conn.close()
+
     # ==================== Export ====================
 
     def export_all_data(self, property_id=1):
@@ -1619,15 +1711,16 @@ class Database:
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT INTO users (email, firstname, lastname, password_hash, google_id, password_plain)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO users (email, firstname, lastname, password_hash, google_id, password_plain, source_platform)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         ''', (
             data['email'].lower(),
             data['firstname'],
             data['lastname'],
             data.get('password_hash'),
             data.get('google_id'),
-            data.get('password_plain')
+            data.get('password_plain'),
+            data.get('source_platform', 'web')
         ))
         conn.commit()
         user_id = cursor.lastrowid
@@ -2231,15 +2324,15 @@ class Database:
 
     # ==================== Mobile Users Management ====================
 
-    def create_mobile_user(self, email, firstname, lastname, password_hash):
+    def create_mobile_user(self, email, firstname, lastname, password_hash, source_platform='mobile'):
         """Create a new mobile user (voyageur)"""
         conn = self.get_connection()
         cursor = conn.cursor()
         try:
             cursor.execute('''
-                INSERT INTO mobile_users (email, firstname, lastname, password_hash)
-                VALUES (?, ?, ?, ?)
-            ''', (email, firstname, lastname, password_hash))
+                INSERT INTO mobile_users (email, firstname, lastname, password_hash, source_platform)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (email, firstname, lastname, password_hash, source_platform))
             conn.commit()
             user_id = cursor.lastrowid
             conn.close()
@@ -2304,6 +2397,111 @@ class Database:
         )
         conn.commit()
         conn.close()
+
+    # ==================== Mobile Sessions Management ====================
+
+    def create_mobile_session(self, mobile_user_id, token, device_name=None, device_model=None,
+                              os_version=None, app_version=None, ip_address=None):
+        """Create a new mobile session"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO mobile_sessions (mobile_user_id, token, device_name, device_model,
+                                        os_version, app_version, ip_address)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (mobile_user_id, token, device_name, device_model, os_version, app_version, ip_address))
+        session_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return session_id
+
+    def get_mobile_session_by_token(self, token):
+        """Get mobile session by token"""
+        conn = self.get_connection()
+        result = conn.execute('''
+            SELECT ms.*, mu.email, mu.firstname, mu.lastname
+            FROM mobile_sessions ms
+            JOIN mobile_users mu ON ms.mobile_user_id = mu.id
+            WHERE ms.token = ? AND ms.is_active = 1
+        ''', (token,)).fetchone()
+        conn.close()
+        return dict(result) if result else None
+
+    def update_mobile_session_activity(self, token, ip_address=None):
+        """Update last activity time for a mobile session"""
+        conn = self.get_connection()
+        if ip_address:
+            conn.execute('''
+                UPDATE mobile_sessions
+                SET last_activity = CURRENT_TIMESTAMP, ip_address = ?
+                WHERE token = ?
+            ''', (ip_address, token))
+        else:
+            conn.execute('''
+                UPDATE mobile_sessions
+                SET last_activity = CURRENT_TIMESTAMP
+                WHERE token = ?
+            ''', (token,))
+        conn.commit()
+        conn.close()
+
+    def deactivate_mobile_session(self, token):
+        """Deactivate a mobile session (logout)"""
+        conn = self.get_connection()
+        conn.execute('''
+            UPDATE mobile_sessions SET is_active = 0 WHERE token = ?
+        ''', (token,))
+        conn.commit()
+        conn.close()
+
+    def deactivate_all_mobile_sessions(self, mobile_user_id):
+        """Deactivate all sessions for a mobile user"""
+        conn = self.get_connection()
+        conn.execute('''
+            UPDATE mobile_sessions SET is_active = 0 WHERE mobile_user_id = ?
+        ''', (mobile_user_id,))
+        conn.commit()
+        conn.close()
+
+    def get_all_mobile_sessions(self, active_only=True):
+        """Get all mobile sessions for SuperAdmin view"""
+        conn = self.get_connection()
+        if active_only:
+            query = '''
+                SELECT ms.*, mu.email, mu.firstname, mu.lastname
+                FROM mobile_sessions ms
+                JOIN mobile_users mu ON ms.mobile_user_id = mu.id
+                WHERE ms.is_active = 1
+                ORDER BY ms.last_activity DESC
+            '''
+        else:
+            query = '''
+                SELECT ms.*, mu.email, mu.firstname, mu.lastname
+                FROM mobile_sessions ms
+                JOIN mobile_users mu ON ms.mobile_user_id = mu.id
+                ORDER BY ms.last_activity DESC
+            '''
+        results = conn.execute(query).fetchall()
+        conn.close()
+        return [dict(r) for r in results]
+
+    def get_mobile_sessions_count(self):
+        """Get count of active mobile sessions"""
+        conn = self.get_connection()
+        result = conn.execute('SELECT COUNT(*) FROM mobile_sessions WHERE is_active = 1').fetchone()
+        conn.close()
+        return result[0] if result else 0
+
+    def get_all_mobile_users_with_source(self):
+        """Get all mobile users with source platform info for SuperAdmin"""
+        conn = self.get_connection()
+        results = conn.execute('''
+            SELECT id, email, firstname, lastname, source_platform, is_active, created_at
+            FROM mobile_users
+            ORDER BY created_at DESC
+        ''').fetchall()
+        conn.close()
+        return [dict(r) for r in results]
 
     # ==================== Property Tokens Management ====================
 
@@ -2646,3 +2844,177 @@ class Database:
 
         conn.close()
         return result
+
+    # ==================== Calendar Sources & Events ====================
+
+    def get_calendar_sources(self, property_id):
+        """Get all calendar sources for a property"""
+        conn = self.get_connection()
+        results = conn.execute('''
+            SELECT * FROM calendar_sources
+            WHERE property_id=?
+            ORDER BY source_name
+        ''', (property_id,)).fetchall()
+        conn.close()
+        return [dict(row) for row in results]
+
+    def add_calendar_source(self, property_id, source_name, ical_url, source_type='ical'):
+        """Add a new calendar source (iCal URL)"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO calendar_sources (property_id, source_name, ical_url, source_type)
+            VALUES (?, ?, ?, ?)
+        ''', (property_id, source_name, ical_url, source_type))
+        conn.commit()
+        source_id = cursor.lastrowid
+        conn.close()
+        return source_id
+
+    def update_calendar_source(self, source_id, source_name=None, ical_url=None, is_active=None):
+        """Update a calendar source"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        updates = []
+        params = []
+        if source_name is not None:
+            updates.append('source_name=?')
+            params.append(source_name)
+        if ical_url is not None:
+            updates.append('ical_url=?')
+            params.append(ical_url)
+        if is_active is not None:
+            updates.append('is_active=?')
+            params.append(1 if is_active else 0)
+        updates.append('updated_at=CURRENT_TIMESTAMP')
+        params.append(source_id)
+
+        cursor.execute(f'''
+            UPDATE calendar_sources
+            SET {', '.join(updates)}
+            WHERE id=?
+        ''', params)
+        conn.commit()
+        conn.close()
+
+    def delete_calendar_source(self, source_id):
+        """Delete a calendar source and its events"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        # First delete associated events
+        cursor.execute('DELETE FROM calendar_events WHERE source_id=?', (source_id,))
+        # Then delete the source
+        cursor.execute('DELETE FROM calendar_sources WHERE id=?', (source_id,))
+        conn.commit()
+        conn.close()
+
+    def update_calendar_sync_status(self, source_id, status, error=None):
+        """Update sync status of a calendar source"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE calendar_sources
+            SET sync_status=?, sync_error=?, last_sync=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP
+            WHERE id=?
+        ''', (status, error, source_id))
+        conn.commit()
+        conn.close()
+
+    def get_calendar_events(self, property_id, start_date=None, end_date=None):
+        """Get calendar events for a property within optional date range"""
+        conn = self.get_connection()
+        query = 'SELECT * FROM calendar_events WHERE property_id=?'
+        params = [property_id]
+
+        if start_date:
+            query += ' AND end_date >= ?'
+            params.append(start_date)
+        if end_date:
+            query += ' AND start_date <= ?'
+            params.append(end_date)
+
+        query += ' ORDER BY start_date'
+        results = conn.execute(query, params).fetchall()
+        conn.close()
+        return [dict(row) for row in results]
+
+    def add_calendar_event(self, property_id, start_date, end_date, summary=None, guest_name=None,
+                          platform=None, source_id=None, uid=None, status='confirmed', notes=None):
+        """Add a calendar event"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO calendar_events (property_id, source_id, uid, summary, start_date, end_date,
+                                        guest_name, platform, status, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (property_id, source_id, uid, summary, start_date, end_date, guest_name, platform, status, notes))
+        conn.commit()
+        event_id = cursor.lastrowid
+        conn.close()
+        return event_id
+
+    def update_calendar_event(self, event_id, **kwargs):
+        """Update a calendar event"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        updates = []
+        params = []
+        for key, value in kwargs.items():
+            if key in ['summary', 'start_date', 'end_date', 'guest_name', 'platform', 'status', 'notes']:
+                updates.append(f'{key}=?')
+                params.append(value)
+        if updates:
+            updates.append('updated_at=CURRENT_TIMESTAMP')
+            params.append(event_id)
+            cursor.execute(f'''
+                UPDATE calendar_events
+                SET {', '.join(updates)}
+                WHERE id=?
+            ''', params)
+            conn.commit()
+        conn.close()
+
+    def delete_calendar_event(self, event_id):
+        """Delete a calendar event"""
+        conn = self.get_connection()
+        conn.execute('DELETE FROM calendar_events WHERE id=?', (event_id,))
+        conn.commit()
+        conn.close()
+
+    def clear_events_from_source(self, source_id):
+        """Delete all events from a specific source (for re-sync)"""
+        conn = self.get_connection()
+        conn.execute('DELETE FROM calendar_events WHERE source_id=?', (source_id,))
+        conn.commit()
+        conn.close()
+
+    def upsert_calendar_event(self, property_id, source_id, uid, start_date, end_date, summary=None,
+                             guest_name=None, platform=None, status='confirmed'):
+        """Insert or update a calendar event based on UID"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        # Check if event exists with this UID
+        existing = conn.execute(
+            'SELECT id FROM calendar_events WHERE source_id=? AND uid=?',
+            (source_id, uid)
+        ).fetchone()
+
+        if existing:
+            cursor.execute('''
+                UPDATE calendar_events
+                SET start_date=?, end_date=?, summary=?, guest_name=?, platform=?, status=?, updated_at=CURRENT_TIMESTAMP
+                WHERE id=?
+            ''', (start_date, end_date, summary, guest_name, platform, status, existing['id']))
+            event_id = existing['id']
+        else:
+            cursor.execute('''
+                INSERT INTO calendar_events (property_id, source_id, uid, summary, start_date, end_date,
+                                            guest_name, platform, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (property_id, source_id, uid, summary, start_date, end_date, guest_name, platform, status))
+            event_id = cursor.lastrowid
+
+        conn.commit()
+        conn.close()
+        return event_id

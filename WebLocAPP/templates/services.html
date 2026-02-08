@@ -49,6 +49,15 @@
         animation: spin 0.8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .btn-icon {
+        padding: 0.35rem 0.5rem;
+        font-size: 0.85rem;
+    }
+    .action-buttons {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: flex-end;
+    }
     .ai-tooltip { position: relative; }
     .ai-tooltip::after {
         content: attr(data-tooltip);
@@ -68,6 +77,68 @@
         margin-bottom: 0.5rem;
     }
     .ai-tooltip:hover::after { opacity: 1; visibility: visible; }
+    .category-row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: flex-end;
+    }
+    .category-row .form-control {
+        flex: 1;
+    }
+    .btn-ai-search {
+        background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 50%, #4f46e5 100%);
+        color: white;
+        border: none;
+        padding: 0.5rem 0.75rem;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        transition: all 0.3s ease;
+        white-space: nowrap;
+        height: 38px;
+    }
+    .btn-ai-search:hover:not(:disabled) {
+        background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 50%, #4338ca 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+    }
+    .btn-ai-search:disabled {
+        background: #d1d5db;
+        color: #9ca3af;
+        cursor: not-allowed;
+    }
+    .btn-ai-search .spinner {
+        width: 14px;
+        height: 14px;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    /* Drag and Drop styles */
+    .drag-handle {
+        cursor: grab;
+        color: #9ca3af;
+        font-size: 1rem;
+        padding: 0 0.5rem;
+        user-select: none;
+    }
+    .drag-handle:active {
+        cursor: grabbing;
+    }
+    .table tr.dragging {
+        opacity: 0.5;
+        background: #e0e7ff;
+    }
+    .table tr.drag-over {
+        border-top: 2px solid #6366f1;
+    }
+    .table tr {
+        transition: background-color 0.2s;
+    }
 </style>
 
 <div class="admin-layout">
@@ -172,18 +243,29 @@
 
             <div class="form-group">
                 <label class="form-label" for="category">Catégorie</label>
-                <select class="form-control" id="category" name="category" required onchange="updateCategoryIcon()">
-                    <option value="">Sélectionnez une catégorie</option>
-                    <option value="pharmacy">💊 Pharmacie</option>
-                    <option value="doctor">🏥 Médecin</option>
-                    <option value="supermarket">🛒 Supermarché</option>
-                    <option value="bakery">🥖 Boulangerie</option>
-                    <option value="restaurant">🍽️ Restaurant</option>
-                    <option value="bank">🏦 Banque</option>
-                    <option value="gas_station">⛽ Station essence</option>
-                    <option value="post">📫 Poste</option>
-                    <option value="other">📍 Autre</option>
-                </select>
+                <div class="category-row">
+                    <select class="form-control" id="category" name="category" required onchange="onCategoryChange()">
+                        <option value="">Sélectionnez une catégorie</option>
+                        <option value="pharmacy">💊 Pharmacie</option>
+                        <option value="doctor">🏥 Médecin</option>
+                        <option value="supermarket">🛒 Supermarché</option>
+                        <option value="bakery">🥖 Boulangerie</option>
+                        <option value="restaurant">🍽️ Restaurant</option>
+                        <option value="bank">🏦 Banque</option>
+                        <option value="gas_station">⛽ Station essence</option>
+                        <option value="post">📫 Poste</option>
+                        <option value="other">📍 Autre</option>
+                    </select>
+                    {% if has_ai_access %}
+                    <button type="button" class="btn-ai-search" id="btnAiSearch" onclick="findServiceWithAI()" disabled title="Rechercher le service le plus proche">
+                        <span>✨</span> Rechercher
+                    </button>
+                    {% else %}
+                    <button type="button" class="btn-ai-search ai-tooltip" disabled data-tooltip="Fonctionnalité réservée aux abonnés">
+                        <span>✨</span> Rechercher
+                    </button>
+                    {% endif %}
+                </div>
             </div>
 
             <div class="form-group">
@@ -257,6 +339,65 @@ function updateCategoryIcon() {
     }
 }
 
+function onCategoryChange() {
+    updateCategoryIcon();
+
+    // Enable/disable AI search button based on category
+    const category = document.getElementById('category').value;
+    const btnAiSearch = document.getElementById('btnAiSearch');
+    if (btnAiSearch) {
+        // Enable if a valid category is selected (not empty and not 'other')
+        btnAiSearch.disabled = !category || category === 'other';
+    }
+}
+
+async function findServiceWithAI() {
+    const category = document.getElementById('category').value;
+    if (!category || category === 'other') return;
+
+    const btn = document.getElementById('btnAiSearch');
+    const originalContent = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Recherche...';
+
+    try {
+        const response = await fetch('/api/ai/find-service', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Property-ID': localStorage.getItem('locapp_current_property')
+            },
+            body: JSON.stringify({ category: category })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.service) {
+            // Fill the form with the found service data
+            const service = result.service;
+            document.getElementById('name').value = service.name || '';
+            document.getElementById('address').value = service.address || '';
+            document.getElementById('phone').value = service.phone || '';
+            document.getElementById('opening_hours').value = service.opening_hours || '';
+
+            // Add distance info to description
+            if (service.distance) {
+                document.getElementById('description').value = `À ${service.distance} de la propriété`;
+            }
+
+            showAlert(result.message, 'success');
+        } else {
+            showAlert(result.error || 'Aucun service trouvé', 'error');
+        }
+    } catch (error) {
+        showAlert('Erreur de connexion', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalContent;
+        onCategoryChange(); // Re-check if button should stay enabled
+    }
+}
+
 async function loadServices() {
     try {
         services = await fetchAPI('/api/services');
@@ -307,9 +448,10 @@ function renderServices() {
     }
 
     let html = `
-        <table class="table">
+        <table class="table" id="servicesTableBody">
             <thead>
                 <tr>
+                    <th style="width: 40px;"></th>
                     <th>Nom</th>
                     <th>Catégorie</th>
                     <th>Adresse</th>
@@ -323,14 +465,15 @@ function renderServices() {
     services.forEach(service => {
         const icon = service.icon || categoryIcons[service.category] || '📍';
         html += `
-            <tr>
+            <tr data-service-id="${service.id}" draggable="true">
+                <td class="drag-handle" title="Glisser pour réordonner">⋮⋮</td>
                 <td>${icon} ${service.name}</td>
                 <td><span class="badge badge-primary">${service.category}</span></td>
                 <td>${service.address || '-'}</td>
                 <td>${service.phone || '-'}</td>
                 <td class="action-buttons">
-                    <button class="btn btn-sm btn-primary" onclick="editService(${service.id})">Modifier</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteService(${service.id})">Supprimer</button>
+                    <button class="btn btn-sm btn-icon btn-secondary" onclick="editService(${service.id})" title="Modifier">✏️</button>
+                    <button class="btn btn-sm btn-icon btn-danger" onclick="deleteService(${service.id})" title="Supprimer">🗑️</button>
                 </td>
             </tr>
         `;
@@ -342,6 +485,89 @@ function renderServices() {
     `;
 
     container.innerHTML = html;
+    initDragAndDrop();
+}
+
+// Drag and Drop functionality
+let draggedRow = null;
+
+function initDragAndDrop() {
+    const rows = document.querySelectorAll('#servicesTableBody tbody tr');
+    rows.forEach(row => {
+        row.addEventListener('dragstart', handleDragStart);
+        row.addEventListener('dragend', handleDragEnd);
+        row.addEventListener('dragover', handleDragOver);
+        row.addEventListener('dragleave', handleDragLeave);
+        row.addEventListener('drop', handleDrop);
+    });
+}
+
+function handleDragStart(e) {
+    draggedRow = this;
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragEnd(e) {
+    this.classList.remove('dragging');
+    draggedRow = null;
+    // Remove all drag-over classes
+    document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+    if (!draggedRow || draggedRow === this) return;
+    this.classList.add('drag-over');
+}
+
+function handleDragLeave(e) {
+    this.classList.remove('drag-over');
+}
+
+function handleDrop(e) {
+    e.preventDefault();
+    this.classList.remove('drag-over');
+
+    if (!draggedRow || draggedRow === this) return;
+
+    const tbody = this.parentNode;
+    const rows = [...tbody.querySelectorAll('tr')];
+    const draggedIndex = rows.indexOf(draggedRow);
+    const dropIndex = rows.indexOf(this);
+
+    if (draggedIndex < dropIndex) {
+        tbody.insertBefore(draggedRow, this.nextSibling);
+    } else {
+        tbody.insertBefore(draggedRow, this);
+    }
+
+    saveServiceOrder();
+}
+
+async function saveServiceOrder() {
+    const rows = document.querySelectorAll('#servicesTableBody tbody tr');
+    const serviceIds = [...rows].map(row => parseInt(row.dataset.serviceId));
+
+    // Update local array order
+    const newServices = serviceIds.map(id => services.find(s => s.id === id));
+    services.splice(0, services.length, ...newServices);
+
+    // Update preview
+    updatePreview();
+
+    // Save to server
+    const propertyId = getCurrentPropertyId();
+    try {
+        await fetch(`/api/services/reorder?property_id=${propertyId}`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ service_ids: serviceIds })
+        });
+    } catch (error) {
+        console.error('Error saving order:', error);
+        showAlert('Erreur lors de la sauvegarde de l\'ordre', 'error');
+    }
 }
 
 function openAddModal() {
@@ -353,6 +579,12 @@ function openAddModal() {
     const iconTrigger = document.getElementById('iconTrigger');
     if (iconTrigger) {
         iconTrigger.textContent = '📍';
+    }
+
+    // Reset AI search button (disabled until category selected)
+    const btnAiSearch = document.getElementById('btnAiSearch');
+    if (btnAiSearch) {
+        btnAiSearch.disabled = true;
     }
 
     openModal('serviceModal');
@@ -370,6 +602,12 @@ async function editService(id) {
     const iconTrigger = document.getElementById('iconTrigger');
     if (iconTrigger) {
         iconTrigger.textContent = service.icon || categoryIcons[service.category] || '📍';
+    }
+
+    // Update AI search button state based on category
+    const btnAiSearch = document.getElementById('btnAiSearch');
+    if (btnAiSearch) {
+        btnAiSearch.disabled = !service.category || service.category === 'other';
     }
 
     openModal('serviceModal');
