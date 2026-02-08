@@ -42,7 +42,7 @@
                 </div>
 
                 <div class="social-login">
-                    <button type="button" class="btn btn-google" onclick="loginWithGoogle()">
+                    <button type="button" class="btn btn-google" onclick="loginWithGoogle('login')">
                         <svg width="20" height="20" viewBox="0 0 24 24">
                             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -59,11 +59,13 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label" for="register-lastname">Nom</label>
-                        <input type="text" class="form-control" id="register-lastname" name="lastname" required placeholder="Dupont">
+                        <input type="text" class="form-control" id="register-lastname" name="lastname" required minlength="2" placeholder="Dupont">
+                        <small style="color: var(--text-light); font-size: 0.75rem;">Minimum 2 caractères</small>
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="register-firstname">Prénom</label>
-                        <input type="text" class="form-control" id="register-firstname" name="firstname" required placeholder="Jean">
+                        <input type="text" class="form-control" id="register-firstname" name="firstname" required minlength="2" placeholder="Jean">
+                        <small style="color: var(--text-light); font-size: 0.75rem;">Minimum 2 caractères</small>
                     </div>
                 </div>
 
@@ -101,7 +103,7 @@
                 </div>
 
                 <div class="social-login">
-                    <button type="button" class="btn btn-google" onclick="loginWithGoogle()">
+                    <button type="button" class="btn btn-google" onclick="loginWithGoogle('register')">
                         <svg width="20" height="20" viewBox="0 0 24 24">
                             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -164,17 +166,50 @@ async function handleLogin(event) {
     }
 }
 
+function isValidEmail(email) {
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    return emailRegex.test(email);
+}
+
 async function handleRegister(event) {
     event.preventDefault();
 
-    const lastname = document.getElementById('register-lastname').value;
-    const firstname = document.getElementById('register-firstname').value;
-    const email = document.getElementById('register-email').value;
+    const lastname = document.getElementById('register-lastname').value.trim();
+    const firstname = document.getElementById('register-firstname').value.trim();
+    const email = document.getElementById('register-email').value.trim();
     const password = document.getElementById('register-password').value;
     const passwordConfirm = document.getElementById('register-password-confirm').value;
 
+    // Validation côté client - Nom
+    if (lastname.length < 2) {
+        showAlert('Le nom doit contenir au moins 2 caractères', 'error');
+        document.getElementById('register-lastname').focus();
+        return;
+    }
+
+    // Validation côté client - Prénom
+    if (firstname.length < 2) {
+        showAlert('Le prénom doit contenir au moins 2 caractères', 'error');
+        document.getElementById('register-firstname').focus();
+        return;
+    }
+
+    // Validation côté client - Email
+    if (!isValidEmail(email)) {
+        showAlert('Veuillez entrer une adresse email valide', 'error');
+        document.getElementById('register-email').focus();
+        return;
+    }
+
+    // Validation côté client - Mots de passe
     if (password !== passwordConfirm) {
         showAlert('Les mots de passe ne correspondent pas', 'error');
+        return;
+    }
+
+    if (password.length < 8) {
+        showAlert('Le mot de passe doit contenir au moins 8 caractères', 'error');
+        document.getElementById('register-password').focus();
         return;
     }
 
@@ -196,16 +231,605 @@ async function handleRegister(event) {
                 window.location.href = '/admin';
             }, 1000);
         } else {
-            showAlert(result.error || 'Erreur lors de la création du compte', 'error');
+            // Gestion spécifique si l'email existe déjà
+            if (result.code === 'EMAIL_EXISTS') {
+                showEmailExistsPopup(email);
+            } else {
+                showAlert(result.error || 'Erreur lors de la création du compte', 'error');
+            }
         }
     } catch (error) {
         showAlert('Erreur de connexion au serveur', 'error');
     }
 }
 
-function loginWithGoogle() {
-    // Redirect to Google OAuth
-    window.location.href = '/api/auth/google';
+function showEmailExistsPopup(email) {
+    // Créer le popup modal
+    const existingPopup = document.getElementById('emailExistsPopup');
+    if (existingPopup) existingPopup.remove();
+
+    const popup = document.createElement('div');
+    popup.id = 'emailExistsPopup';
+    popup.className = 'popup-overlay';
+    popup.innerHTML = `
+        <div class="popup-content">
+            <div class="popup-icon">⚠️</div>
+            <h3>Compte existant</h3>
+            <p>Un compte est déjà associé à l'adresse email :</p>
+            <p><strong>${email}</strong></p>
+            <div class="popup-actions">
+                <button class="btn btn-secondary" onclick="closeEmailExistsPopup()">Fermer</button>
+                <button class="btn btn-primary" onclick="goToLogin('${email}')">Se connecter</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(popup);
+
+    // Ajouter les styles du popup si pas déjà présents
+    if (!document.getElementById('popupStyles')) {
+        const style = document.createElement('style');
+        style.id = 'popupStyles';
+        style.textContent = `
+            .popup-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 9999;
+                animation: fadeIn 0.2s ease;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            .popup-content {
+                background: white;
+                border-radius: 16px;
+                padding: 2rem;
+                max-width: 400px;
+                width: 90%;
+                text-align: center;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                animation: slideUp 0.3s ease;
+            }
+            @keyframes slideUp {
+                from { transform: translateY(20px); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+            }
+            .popup-icon {
+                font-size: 3rem;
+                margin-bottom: 1rem;
+            }
+            .popup-content h3 {
+                margin: 0 0 1rem 0;
+                color: #1e3a5f;
+            }
+            .popup-content p {
+                color: #666;
+                margin: 0.5rem 0;
+            }
+            .popup-content p strong {
+                color: #1e3a5f;
+            }
+            .popup-actions {
+                display: flex;
+                gap: 1rem;
+                justify-content: center;
+                margin-top: 1.5rem;
+            }
+            .popup-actions .btn {
+                min-width: 120px;
+            }
+        `;
+        document.head.appendChild(style);
+    }
 }
+
+function closeEmailExistsPopup() {
+    const popup = document.getElementById('emailExistsPopup');
+    if (popup) popup.remove();
+}
+
+function goToLogin(email) {
+    closeEmailExistsPopup();
+    switchTab('login');
+    document.getElementById('login-email').value = email;
+    document.getElementById('login-password').focus();
+}
+
+function loginWithGoogle(action = 'login') {
+    // Redirect to Google OAuth with action parameter
+    window.location.href = `/api/auth/google?action=${action}`;
+}
+
+function showGoogleAccountExistsPopup() {
+    // Créer le popup modal
+    const existingPopup = document.getElementById('googleAccountExistsPopup');
+    if (existingPopup) existingPopup.remove();
+
+    const popup = document.createElement('div');
+    popup.id = 'googleAccountExistsPopup';
+    popup.className = 'popup-overlay';
+    popup.innerHTML = `
+        <div class="popup-content">
+            <div class="popup-icon">📧</div>
+            <h3>Compte existant</h3>
+            <p>Un compte est déjà associé à cette adresse email avec un mot de passe.</p>
+            <p>Veuillez vous connecter avec votre <strong>email et mot de passe</strong> au lieu de Google.</p>
+            <div class="popup-actions">
+                <button class="btn btn-primary" onclick="closeGoogleAccountExistsPopup()">Compris</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(popup);
+
+    // Utiliser les styles du popup existant
+    if (!document.getElementById('popupStyles')) {
+        const style = document.createElement('style');
+        style.id = 'popupStyles';
+        style.textContent = `
+            .popup-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 9999;
+                animation: fadeIn 0.2s ease;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            .popup-content {
+                background: white;
+                border-radius: 16px;
+                padding: 2rem;
+                max-width: 400px;
+                width: 90%;
+                text-align: center;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                animation: slideUp 0.3s ease;
+            }
+            @keyframes slideUp {
+                from { transform: translateY(20px); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+            }
+            .popup-icon {
+                font-size: 3rem;
+                margin-bottom: 1rem;
+            }
+            .popup-content h3 {
+                margin: 0 0 1rem 0;
+                color: #1e3a5f;
+            }
+            .popup-content p {
+                color: #666;
+                margin: 0.5rem 0;
+            }
+            .popup-content p strong {
+                color: #1e3a5f;
+            }
+            .popup-actions {
+                display: flex;
+                gap: 1rem;
+                justify-content: center;
+                margin-top: 1.5rem;
+            }
+            .popup-actions .btn {
+                min-width: 120px;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+function closeGoogleAccountExistsPopup() {
+    const popup = document.getElementById('googleAccountExistsPopup');
+    if (popup) popup.remove();
+    // Nettoyer l'URL
+    window.history.replaceState({}, document.title, window.location.pathname);
+}
+
+function showGoogleAccountAlreadyExistsPopup() {
+    // Créer le popup modal pour compte Google déjà existant
+    const existingPopup = document.getElementById('googleAccountAlreadyExistsPopup');
+    if (existingPopup) existingPopup.remove();
+
+    const popup = document.createElement('div');
+    popup.id = 'googleAccountAlreadyExistsPopup';
+    popup.className = 'popup-overlay';
+    popup.innerHTML = `
+        <div class="popup-content">
+            <div class="popup-icon">✅</div>
+            <h3>Compte déjà existant</h3>
+            <p>Un compte Google est déjà associé à cette adresse email.</p>
+            <p>Utilisez le bouton <strong>Continuer avec Google</strong> pour vous connecter.</p>
+            <div class="popup-actions">
+                <button class="btn btn-primary" onclick="closeGoogleAccountAlreadyExistsPopup()">Compris</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(popup);
+
+    // Utiliser les styles du popup existant
+    if (!document.getElementById('popupStyles')) {
+        const style = document.createElement('style');
+        style.id = 'popupStyles';
+        style.textContent = `
+            .popup-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 9999;
+                animation: fadeIn 0.2s ease;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            .popup-content {
+                background: white;
+                border-radius: 16px;
+                padding: 2rem;
+                max-width: 400px;
+                width: 90%;
+                text-align: center;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                animation: slideUp 0.3s ease;
+            }
+            @keyframes slideUp {
+                from { transform: translateY(20px); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+            }
+            .popup-icon {
+                font-size: 3rem;
+                margin-bottom: 1rem;
+            }
+            .popup-content h3 {
+                margin: 0 0 1rem 0;
+                color: #1e3a5f;
+            }
+            .popup-content p {
+                color: #666;
+                margin: 0.5rem 0;
+            }
+            .popup-content p strong {
+                color: #1e3a5f;
+            }
+            .popup-actions {
+                display: flex;
+                gap: 1rem;
+                justify-content: center;
+                margin-top: 1.5rem;
+            }
+            .popup-actions .btn {
+                min-width: 120px;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+function closeGoogleAccountAlreadyExistsPopup() {
+    const popup = document.getElementById('googleAccountAlreadyExistsPopup');
+    if (popup) popup.remove();
+    // Nettoyer l'URL - l'utilisateur reste sur la page de connexion
+    window.history.replaceState({}, document.title, window.location.pathname);
+}
+
+function showAccountExistsPopup() {
+    // Créer le popup modal pour compte déjà existant (tentative d'inscription)
+    const existingPopup = document.getElementById('accountExistsPopup');
+    if (existingPopup) existingPopup.remove();
+
+    const popup = document.createElement('div');
+    popup.id = 'accountExistsPopup';
+    popup.className = 'popup-overlay';
+    popup.innerHTML = `
+        <div class="popup-content">
+            <div class="popup-icon">⚠️</div>
+            <h3>Compte déjà existant</h3>
+            <p>Un compte est déjà associé à cette adresse email.</p>
+            <p>Utilisez l'onglet <strong>Connexion</strong> pour vous connecter.</p>
+            <div class="popup-actions">
+                <button class="btn btn-primary" onclick="closeAccountExistsPopup()">Compris</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(popup);
+
+    // Utiliser les styles du popup existant
+    if (!document.getElementById('popupStyles')) {
+        const style = document.createElement('style');
+        style.id = 'popupStyles';
+        style.textContent = `
+            .popup-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 9999;
+                animation: fadeIn 0.2s ease;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            .popup-content {
+                background: white;
+                border-radius: 16px;
+                padding: 2rem;
+                max-width: 400px;
+                width: 90%;
+                text-align: center;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                animation: slideUp 0.3s ease;
+            }
+            @keyframes slideUp {
+                from { transform: translateY(20px); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+            }
+            .popup-icon {
+                font-size: 3rem;
+                margin-bottom: 1rem;
+            }
+            .popup-content h3 {
+                margin: 0 0 1rem 0;
+                color: #1e3a5f;
+            }
+            .popup-content p {
+                color: #666;
+                margin: 0.5rem 0;
+            }
+            .popup-content p strong {
+                color: #1e3a5f;
+            }
+            .popup-actions {
+                display: flex;
+                gap: 1rem;
+                justify-content: center;
+                margin-top: 1.5rem;
+            }
+            .popup-actions .btn {
+                min-width: 120px;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+function closeAccountExistsPopup() {
+    const popup = document.getElementById('accountExistsPopup');
+    if (popup) popup.remove();
+    // Nettoyer l'URL et basculer sur l'onglet connexion
+    window.history.replaceState({}, document.title, window.location.pathname);
+    switchTab('login');
+}
+
+function showAccountNotFoundPopup() {
+    // Créer le popup modal pour compte non trouvé (tentative de connexion)
+    const existingPopup = document.getElementById('accountNotFoundPopup');
+    if (existingPopup) existingPopup.remove();
+
+    const popup = document.createElement('div');
+    popup.id = 'accountNotFoundPopup';
+    popup.className = 'popup-overlay';
+    popup.innerHTML = `
+        <div class="popup-content">
+            <div class="popup-icon">🔍</div>
+            <h3>Compte non trouvé</h3>
+            <p>Ce compte n'existe pas sur LocAPP.</p>
+            <p>Veuillez créer un compte via l'onglet <strong>Inscription</strong>.</p>
+            <div class="popup-actions">
+                <button class="btn btn-primary" onclick="closeAccountNotFoundPopup()">Créer un compte</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(popup);
+
+    // Utiliser les styles du popup existant
+    if (!document.getElementById('popupStyles')) {
+        const style = document.createElement('style');
+        style.id = 'popupStyles';
+        style.textContent = `
+            .popup-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 9999;
+                animation: fadeIn 0.2s ease;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            .popup-content {
+                background: white;
+                border-radius: 16px;
+                padding: 2rem;
+                max-width: 400px;
+                width: 90%;
+                text-align: center;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                animation: slideUp 0.3s ease;
+            }
+            @keyframes slideUp {
+                from { transform: translateY(20px); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+            }
+            .popup-icon {
+                font-size: 3rem;
+                margin-bottom: 1rem;
+            }
+            .popup-content h3 {
+                margin: 0 0 1rem 0;
+                color: #1e3a5f;
+            }
+            .popup-content p {
+                color: #666;
+                margin: 0.5rem 0;
+            }
+            .popup-content p strong {
+                color: #1e3a5f;
+            }
+            .popup-actions {
+                display: flex;
+                gap: 1rem;
+                justify-content: center;
+                margin-top: 1.5rem;
+            }
+            .popup-actions .btn {
+                min-width: 120px;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+function closeAccountNotFoundPopup() {
+    const popup = document.getElementById('accountNotFoundPopup');
+    if (popup) popup.remove();
+    // Nettoyer l'URL et basculer sur l'onglet inscription
+    window.history.replaceState({}, document.title, window.location.pathname);
+    switchTab('register');
+}
+
+function showSessionExpiredPopup() {
+    // Créer le popup modal pour session expirée
+    const existingPopup = document.getElementById('sessionExpiredPopup');
+    if (existingPopup) existingPopup.remove();
+
+    const popup = document.createElement('div');
+    popup.id = 'sessionExpiredPopup';
+    popup.className = 'popup-overlay';
+    popup.innerHTML = `
+        <div class="popup-content">
+            <div class="popup-icon">🔒</div>
+            <h3>Session expirée</h3>
+            <p>Votre session a expiré ou vos identifiants ont été perdus.</p>
+            <p>Veuillez vous <strong>reconnecter</strong> pour continuer.</p>
+            <div class="popup-actions">
+                <button class="btn btn-primary" onclick="closeSessionExpiredPopup()">Me reconnecter</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(popup);
+
+    // Utiliser les styles du popup existant
+    if (!document.getElementById('popupStyles')) {
+        const style = document.createElement('style');
+        style.id = 'popupStyles';
+        style.textContent = `
+            .popup-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 9999;
+                animation: fadeIn 0.2s ease;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            .popup-content {
+                background: white;
+                border-radius: 16px;
+                padding: 2rem;
+                max-width: 400px;
+                width: 90%;
+                text-align: center;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                animation: slideUp 0.3s ease;
+            }
+            @keyframes slideUp {
+                from { transform: translateY(20px); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+            }
+            .popup-icon {
+                font-size: 3rem;
+                margin-bottom: 1rem;
+            }
+            .popup-content h3 {
+                margin: 0 0 1rem 0;
+                color: #1e3a5f;
+            }
+            .popup-content p {
+                color: #666;
+                margin: 0.5rem 0;
+            }
+            .popup-content p strong {
+                color: #1e3a5f;
+            }
+            .popup-actions {
+                display: flex;
+                gap: 1rem;
+                justify-content: center;
+                margin-top: 1.5rem;
+            }
+            .popup-actions .btn {
+                min-width: 120px;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+function closeSessionExpiredPopup() {
+    const popup = document.getElementById('sessionExpiredPopup');
+    if (popup) popup.remove();
+    // Nettoyer l'URL
+    window.history.replaceState({}, document.title, window.location.pathname);
+}
+
+// Vérifier les erreurs au chargement de la page
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const error = urlParams.get('error');
+
+    if (error === 'session_expired') {
+        showSessionExpiredPopup();
+    } else if (error === 'account_exists') {
+        showAccountExistsPopup();
+    } else if (error === 'account_not_found') {
+        showAccountNotFoundPopup();
+    } else if (error === 'oauth_failed') {
+        showAlert('Erreur lors de la connexion avec Google. Veuillez réessayer.', 'error');
+    } else if (error === 'no_email') {
+        showAlert('Impossible de récupérer votre email depuis Google.', 'error');
+    }
+});
 </script>
 {% endblock %}
